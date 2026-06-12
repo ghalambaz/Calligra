@@ -1,0 +1,44 @@
+---
+title: "TypeScript in Astro: Type-Safe Components from Day One"
+description: "Astro has first-class TypeScript support. Here's how to write type-safe components, props, and content collections."
+datetime: "2025-02-10"
+image: "https://images.unsplash.com/photo-1542831371-29b0f74f9713?fit=crop&w=900&h=500&q=80"
+category: "TypeScript"
+tags: ["typescript", "astro", "type-safety", "web-dev"]
+---
+
+# TypeScript in Astro
+
+Astro ships with TypeScript support out of the box — no config needed.
+
+## Typed Props
+
+```astro
+---
+interface Props {
+  title: string;
+  count?: number;
+  tags: string[];
+}
+const { title, count = 0, tags } = Astro.props;
+---
+```
+
+## Typed Content Collections
+
+```ts
+// src/content/config.ts
+import { defineCollection, z } from 'astro:content';
+
+const blog = defineCollection({
+  schema: z.object({
+    title: z.string(),
+    tags: z.array(z.string()),
+    pubDate: z.coerce.date(),
+  }),
+});
+```
+
+## Why It Matters
+
+Type safety catches bugs at build time, not in production. With Zod schemas, your frontmatter is validated automatically.

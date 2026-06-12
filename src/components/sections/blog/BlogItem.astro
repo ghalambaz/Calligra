@@ -1,0 +1,269 @@
+---
+import type { Blog } from '../../../types/BlogType';
+
+interface Props {
+  blog: Blog;
+  isHero?: boolean;
+}
+
+const { blog, isHero = false } = Astro.props;
+
+const date = new Date(blog.data.datetime).toLocaleDateString('en-US', {
+  year: 'numeric', month: 'long', day: 'numeric'
+});
+const slug = `/blogs/${blog.slug}`;
+const category = blog.data.category ?? 'General';
+const tags = blog.data.tags ?? [];
+---
+
+{isHero ? (
+  <!-- ── HERO CARD (latest post, image on top) ── -->
+  <article class="hero-card">
+    <a href={slug} class="hero-img-link" tabindex="-1" aria-hidden="true">
+      {blog.data.image ? (
+        <img src={blog.data.image} alt={blog.data.title} class="hero-img" loading="eager" />
+      ) : (
+        <div class="hero-placeholder">
+          <span class="placeholder-letter">{blog.data.title.charAt(0)}</span>
+        </div>
+      )}
+      <div class="hero-overlay" aria-hidden="true"></div>
+    </a>
+
+    <div class="hero-body">
+      <div class="hero-meta">
+        <a href={`/blogs/category/${category.toLowerCase().replace(/\s+/g,'-')}`} class="badge badge-cat">
+          {category}
+        </a>
+        <span class="badge badge-new">Latest</span>
+        {tags.slice(0,2).map(t => (
+          <a href={`/blogs/tag/${t}`} class="badge badge-tag">#{t}</a>
+        ))}
+      </div>
+      <a href={slug} class="hero-title-link">
+        <h2 class="hero-title">{blog.data.title}</h2>
+      </a>
+      <p class="hero-desc">{blog.data.description}</p>
+      <div class="hero-footer">
+        <time datetime={blog.data.datetime} class="hero-date">{date}</time>
+        <a href={slug} class="hero-cta">Read article →</a>
+      </div>
+    </div>
+  </article>
+) : (
+  <!-- ── REGULAR CARD (image on right) ── -->
+  <article class="post-card">
+    <div class="post-body">
+      <div class="post-meta">
+        <a href={`/blogs/category/${category.toLowerCase().replace(/\s+/g,'-')}`} class="badge badge-cat">
+          {category}
+        </a>
+        {tags.slice(0,2).map(t => (
+          <a href={`/blogs/tag/${t}`} class="badge badge-tag">#{t}</a>
+        ))}
+      </div>
+      <a href={slug} class="post-title-link">
+        <h2 class="post-title">{blog.data.title}</h2>
+      </a>
+      <p class="post-desc">{blog.data.description}</p>
+      <time datetime={blog.data.datetime} class="post-date">{date}</time>
+    </div>
+
+    {blog.data.image && (
+      <a href={slug} class="post-img-link" tabindex="-1" aria-hidden="true">
+        <img src={blog.data.image} alt={blog.data.title} class="post-img" loading="lazy" />
+      </a>
+    )}
+  </article>
+)}
+
+<style>
+/* ────────────────── HERO ────────────────── */
+.hero-card {
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--color-background-offset);
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+.hero-card:hover {
+  box-shadow: 0 8px 32px -8px color-mix(in srgb, var(--color-primary) 20%, transparent);
+  border-color: color-mix(in srgb, var(--color-primary) 30%, var(--color-border));
+}
+
+.hero-img-link {
+  display: block;
+  position: relative;
+  aspect-ratio: 16 / 6;
+  overflow: hidden;
+}
+.hero-img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.45s ease;
+}
+.hero-card:hover .hero-img { transform: scale(1.03); }
+
+.hero-placeholder {
+  width: 100%; height: 100%;
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--color-primary) 12%, var(--color-background-offset)),
+    var(--color-background-offset)
+  );
+  display: flex; align-items: center; justify-content: center;
+}
+.placeholder-letter {
+  font-size: clamp(5rem, 14vw, 9rem);
+  font-weight: 800;
+  color: var(--color-border);
+  line-height: 1;
+}
+
+.hero-overlay {
+  position: absolute; inset: 0;
+  background: linear-gradient(to top, rgba(0,0,0,0.06), transparent 50%);
+  pointer-events: none;
+}
+
+.hero-body {
+  padding: 1.75rem 2rem 2rem;
+  display: flex; flex-direction: column; gap: 0.75rem;
+}
+
+.hero-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+.hero-title-link { display: block; }
+.hero-title {
+  font-size: clamp(1.5rem, 3.5vw, 2.1rem);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+  transition: color 0.15s;
+}
+.hero-title-link:hover .hero-title { color: var(--color-primary); }
+
+.hero-desc {
+  font-size: 1rem;
+  color: var(--color-text-offset);
+  line-height: 1.65;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.hero-footer {
+  display: flex; align-items: center; gap: 12px;
+  margin-top: 0.25rem; flex-wrap: wrap;
+}
+.hero-date { font-size: 13px; color: var(--color-text-offset); }
+.hero-cta {
+  margin-left: auto;
+  font-size: 13px; font-weight: 600;
+  color: var(--color-primary);
+  transition: opacity 0.15s;
+}
+.hero-cta:hover { opacity: 0.7; }
+
+/* ────────────────── REGULAR ────────────────── */
+.post-card {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--color-background-offset);
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+.post-card:hover {
+  box-shadow: 0 4px 20px -6px color-mix(in srgb, var(--color-primary) 15%, transparent);
+  border-color: color-mix(in srgb, var(--color-primary) 25%, var(--color-border));
+}
+
+.post-body {
+  flex: 1;
+  padding: 1.25rem 1.5rem;
+  display: flex; flex-direction: column; gap: 0.45rem;
+  min-width: 0;
+}
+
+.post-meta { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+
+.post-title-link { display: block; }
+.post-title {
+  font-size: clamp(1rem, 2vw, 1.2rem);
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+  transition: color 0.15s;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.post-title-link:hover .post-title { color: var(--color-primary); }
+
+.post-desc {
+  font-size: 0.875rem;
+  color: var(--color-text-offset);
+  line-height: 1.55;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.post-date { font-size: 12px; color: var(--color-text-offset); margin-top: 0.15rem; }
+
+.post-img-link {
+  display: block;
+  width: 200px;
+  flex-shrink: 0;
+  align-self: stretch;
+  overflow: hidden;
+}
+.post-img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.35s ease;
+}
+.post-card:hover .post-img { transform: scale(1.05); }
+
+/* ────────────────── BADGES ────────────────── */
+.badge {
+  display: inline-flex; align-items: center;
+  font-size: 11px; font-weight: 600;
+  letter-spacing: 0.03em;
+  padding: 2px 9px;
+  border-radius: 100px;
+  text-decoration: none;
+  transition: opacity 0.15s;
+  white-space: nowrap;
+}
+.badge:hover { opacity: 0.8; }
+
+.badge-cat {
+  background: var(--color-primary);
+  color: #fff;
+}
+.badge-new {
+  background: color-mix(in srgb, var(--color-primary) 14%, var(--color-background));
+  color: var(--color-primary);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 25%, transparent);
+}
+.badge-tag {
+  background: color-mix(in srgb, var(--color-text) 8%, var(--color-background));
+  color: var(--color-text-offset);
+  border: 1px solid var(--color-border);
+}
+
+@media (max-width: 640px) {
+  .hero-body { padding: 1.25rem; }
+  .post-img-link { width: 120px; }
+}
+</style>

@@ -1,0 +1,276 @@
+---
+import { getCollection } from 'astro:content';
+
+const allBlogs = await getCollection('blogs');
+const latest = allBlogs
+  .sort((a, b) => new Date(b.data.datetime).getTime() - new Date(a.data.datetime).getTime())
+  .slice(0, 3);
+
+const formatDate = (d: string) => new Date(d).toLocaleDateString('en-US', {
+  year: 'numeric', month: 'short', day: 'numeric'
+});
+---
+
+<section class="latest-section">
+  <div class="container mx-auto max-w-6xl px-4 md:px-8">
+
+    <div class="section-header">
+      <div class="section-label">
+        <span class="label-dot" aria-hidden="true"></span>
+        From the blog
+      </div>
+      <h2 class="section-title">Latest Writing</h2>
+      <p class="section-sub">Thoughts on building software, tools, and the web.</p>
+    </div>
+
+    <div class="posts-grid">
+      {latest.map((post, i) => (
+        <article class:list={['post-card', { 'post-card--featured': i === 0 }]}>
+          {post.data.image && (
+            <a href={`/blogs/${post.slug}`} class="card-img-link" tabindex="-1" aria-hidden="true">
+              <img
+                src={post.data.image}
+                alt={post.data.title}
+                class="card-img"
+                loading="lazy"
+              />
+            </a>
+          )}
+          <div class="card-body">
+            <div class="card-meta">
+              {post.data.category && (
+                <a href={`/blogs/category/${post.data.category.toLowerCase().replace(/\s+/g,'-')}`} class="cat-badge">
+                  {post.data.category}
+                </a>
+              )}
+              {post.data.tags?.slice(0,1).map(t => (
+                <span class="tag-badge">#{t}</span>
+              ))}
+            </div>
+            <a href={`/blogs/${post.slug}`} class="card-title-link">
+              <h3 class="card-title">{post.data.title}</h3>
+            </a>
+            <p class="card-desc">{post.data.description}</p>
+            <time datetime={post.data.datetime} class="card-date">{formatDate(post.data.datetime)}</time>
+          </div>
+        </article>
+      ))}
+    </div>
+
+    <div class="section-footer">
+      <a href="/blogs" class="all-posts-btn">
+        View all posts
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+          <path d="M5 12h14M12 5l7 7-7 7"/>
+        </svg>
+      </a>
+    </div>
+
+  </div>
+</section>
+
+<style>
+.latest-section {
+  padding: 5rem 0 5rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.section-header {
+  margin-bottom: 2.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.section-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--color-text-offset);
+}
+
+.label-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  display: inline-block;
+}
+
+.section-title {
+  font-size: clamp(1.5rem, 3vw, 2.1rem);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--color-text);
+  line-height: 1.15;
+}
+
+.section-sub {
+  font-size: 0.9375rem;
+  color: var(--color-text-offset);
+}
+
+/* ── Grid ── */
+.posts-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+/* ── Card base ── */
+.post-card {
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--color-background-offset);
+  display: flex;
+  flex-direction: column;
+  transition: border-color 0.18s, box-shadow 0.18s, transform 0.18s;
+}
+
+.post-card:hover {
+  border-color: color-mix(in srgb, var(--color-primary) 35%, var(--color-border));
+  box-shadow: 0 8px 28px -8px color-mix(in srgb, var(--color-primary) 18%, transparent);
+  transform: translateY(-2px);
+}
+
+/* Featured card (first) has taller image */
+.post-card--featured .card-img-link { aspect-ratio: 16 / 8; }
+.card-img-link {
+  display: block;
+  aspect-ratio: 16 / 8;
+  overflow: hidden;
+}
+
+.card-img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.4s ease;
+}
+.post-card:hover .card-img { transform: scale(1.04); }
+
+.card-body {
+  padding: 1.1rem 1.25rem 1.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  flex: 1;
+}
+
+.card-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.cat-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 100px;
+  background: var(--color-primary);
+  color: #fff;
+  text-decoration: none;
+  transition: opacity 0.15s;
+}
+.cat-badge:hover { opacity: 0.8; }
+
+.tag-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 7px;
+  border-radius: 100px;
+  background: color-mix(in srgb, var(--color-text) 7%, var(--color-background));
+  color: var(--color-text-offset);
+  border: 1px solid var(--color-border);
+}
+
+.card-title-link { display: block; }
+.card-title {
+  font-size: clamp(0.9375rem, 1.5vw, 1.075rem);
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+  transition: color 0.15s;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.card-title-link:hover .card-title { color: var(--color-primary); }
+
+.card-desc {
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: var(--color-text-offset);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.card-date {
+  font-size: 11px;
+  color: var(--color-text-offset);
+  margin-top: auto;
+  padding-top: 0.35rem;
+}
+
+/* ── Footer CTA ── */
+.section-footer {
+  display: flex;
+  justify-content: center;
+  margin-top: 2.5rem;
+}
+
+.all-posts-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 24px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-background-offset);
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.15s;
+}
+
+.all-posts-btn:hover {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 6%, var(--color-background-offset));
+  color: var(--color-primary);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px -4px color-mix(in srgb, var(--color-primary) 20%, transparent);
+}
+
+.all-posts-btn svg {
+  transition: transform 0.15s;
+}
+.all-posts-btn:hover svg { transform: translateX(3px); }
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .posts-grid { grid-template-columns: 1fr 1fr; }
+  .post-card--featured { grid-column: 1 / -1; }
+}
+
+@media (max-width: 600px) {
+  .posts-grid { grid-template-columns: 1fr; }
+}
+</style>

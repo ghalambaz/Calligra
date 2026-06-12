@@ -1,0 +1,24 @@
+---
+import { getCollection } from 'astro:content';
+import BlogPage from '../../../../components/sections/blog/BlogPage.astro';
+
+export async function getStaticPaths({ paginate }) {
+  const allBlogs = await getCollection('blogs');
+  const tags = [...new Set(allBlogs.flatMap(p => p.data.tags ?? []))];
+
+  return tags.flatMap(tag => {
+    const filtered = allBlogs
+      .filter(p => p.data.tags?.includes(tag))
+      .sort((a, b) => new Date(b.data.datetime).getTime() - new Date(a.data.datetime).getTime());
+
+    return paginate(filtered, {
+      params: { tag },
+      props: { activeTag: tag },
+      pageSize: 5,
+    });
+  });
+}
+
+const { page, activeTag } = Astro.props;
+---
+<BlogPage page={page} activeTag={activeTag} />

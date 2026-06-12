@@ -1,0 +1,25 @@
+---
+import { getCollection } from 'astro:content';
+import BlogPage from '../../../../components/sections/blog/BlogPage.astro';
+
+export async function getStaticPaths({ paginate }) {
+  const allBlogs = await getCollection('blogs');
+  const categories = [...new Set(allBlogs.map(p => p.data.category).filter(Boolean))];
+
+  return categories.flatMap(category => {
+    const slug = category.toLowerCase().replace(/\s+/g, '-');
+    const filtered = allBlogs
+      .filter(p => p.data.category?.toLowerCase().replace(/\s+/g, '-') === slug)
+      .sort((a, b) => new Date(b.data.datetime).getTime() - new Date(a.data.datetime).getTime());
+
+    return paginate(filtered, {
+      params: { category: slug },
+      props: { activeCategory: category },
+      pageSize: 5,
+    });
+  });
+}
+
+const { page, activeCategory } = Astro.props;
+---
+<BlogPage page={page} activeCategory={activeCategory} />

@@ -1,0 +1,35 @@
+---
+title: "Introduction to Astro: A New Era for Frontend Web Development"
+description: "Astro is an innovative framework for building fast, optimized websites with a focus on delivering minimal JavaScript to the client."
+datetime: "2025-03-23"
+image: "https://images.unsplash.com/photo-1555066931-4365d14bab8c?fit=crop&w=900&h=500&q=80"
+category: "Tutorial"
+tags: ["astro", "frontend", "javascript", "web-dev"]
+---
+
+# Introduction to Astro 🚀
+
+Astro is gaining popularity fast. Here's why it matters.
+
+## The Core Idea
+
+Astro ships **zero JavaScript** by default. Components render to static HTML at build time. You opt-in to JavaScript only where needed.
+
+## Islands Architecture
+
+Interactive "islands" of JavaScript sit in a sea of static HTML. Each island hydrates independently.
+
+```astro
+---
+import Counter from './Counter.jsx';
+---
+<h1>Static heading</h1>
+<Counter client:visible />
+```
+
+## Why Developers Love It
+
+- Blazing-fast Lighthouse scores
+- Use React, Vue, Svelte — or none
+- File-based routing
+- MDX support out of the box

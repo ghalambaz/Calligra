@@ -1,0 +1,219 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import BlogList from '../../sections/blog/BlogList.astro';
+import BlogBanner from '../../sections/blog/BlogBanner.astro';
+import Pagination from '../../common/Pagination.astro';
+import { getCollection } from 'astro:content';
+import type { Page } from 'astro';
+import type { CollectionEntry } from 'astro:content';
+
+export interface Props {
+  page: Page<CollectionEntry<'blogs'>>;
+  activeCategory?: string;
+  activeTag?: string;
+}
+
+const { page, activeCategory, activeTag } = Astro.props;
+
+// Collect all posts for search + sidebar
+const allPosts = await getCollection('blogs');
+const categories = [...new Set(allPosts.map(p => p.data.category).filter(Boolean))].sort() as string[];
+const tags = [...new Set(allPosts.map(p => p.data.tags).filter(Boolean).flat())].sort() as string[];
+
+// Serialize all posts for client-side search
+const searchIndex = allPosts.map(p => ({
+  slug: p.slug,
+  title: p.data.title,
+  description: p.data.description,
+  category: p.data.category,
+  tags: p.data.tags,
+  datetime: p.data.datetime,
+  image: p.data.image,
+}));
+---
+
+<Layout title="Blog">
+  <BlogBanner
+    totalPosts={page.total}
+    categories={categories}
+    tags={tags}
+    activeCategory={activeCategory}
+    activeTag={activeTag}
+  />
+  <BlogList blogs={(page?.data ?? []) as any} />
+  <div class="container mx-auto px-4 max-w-4xl pb-8">
+    <Pagination page={page} />
+  </div>
+</Layout>
+
+<script define:vars={{ searchIndex }}>
+const input = document.getElementById('blog-search');
+const overlay = document.getElementById('search-results');
+
+if (!input || !overlay) throw new Error('Search elements missing');
+
+let debounceTimer;
+
+function renderResults(query) {
+  const q = query.trim().toLowerCase();
+  if (!q) {
+    overlay.hidden = true;
+    overlay.innerHTML = '';
+    return;
+  }
+
+  const hits = searchIndex.filter(p =>
+    p.title.toLowerCase().includes(q) ||
+    p.description.toLowerCase().includes(q) ||
+    (p.category && p.category.toLowerCase().includes(q)) ||
+    (p.tags && p.tags.some(t => t.toLowerCase().includes(q)))
+  ).slice(0, 8);
+
+  overlay.hidden = false;
+
+  if (hits.length === 0) {
+    overlay.innerHTML = `
+      <div class="sr-box">
+        <div class="sr-header"><span class="sr-query">"${query}"</span><button class="sr-close" aria-label="Close search">✕</button></div>
+        <p class="sr-empty">No posts found for this search.</p>
+      </div>`;
+  } else {
+    overlay.innerHTML = `
+      <div class="sr-box">
+        <div class="sr-header">
+          <span class="sr-query">${hits.length} result${hits.length > 1 ? 's' : ''} for "<strong>${query}</strong>"</span>
+          <button class="sr-close" aria-label="Close search">✕</button>
+        </div>
+        <ul class="sr-list">
+          ${hits.map(p => `
+            <li class="sr-item">
+              <a href="/blogs/${p.slug}" class="sr-link">
+                ${p.image ? `<img src="${p.image}" alt="" class="sr-thumb" loading="lazy"/>` : `<div class="sr-thumb-placeholder">${p.title.charAt(0)}</div>`}
+                <div class="sr-text">
+                  <span class="sr-cat">${p.category ?? ''}</span>
+                  <span class="sr-title">${p.title}</span>
+                  <span class="sr-desc">${p.description}</span>
+                </div>
+              </a>
+            </li>
+          `).join('')}
+        </ul>
+      </div>`;
+  }
+
+  overlay.querySelector('.sr-close')?.addEventListener('click', closeSearch);
+}
+
+function closeSearch() {
+  overlay.hidden = true;
+  overlay.innerHTML = '';
+  input.value = '';
+}
+
+input.addEventListener('input', e => {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => renderResults(e.target.value), 200);
+});
+
+input.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeSearch();
+});
+
+overlay.addEventListener('click', e => {
+  if (e.target === overlay) closeSearch();
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+    e.preventDefault();
+    input.focus();
+  }
+});
+</script>
+
+<style is:global>
+/* Search overlay styles */
+.sr-box {
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  width: min(600px, 92vw);
+  max-height: 70vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 24px 64px -16px rgba(0,0,0,0.2);
+}
+
+.sr-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 13px;
+  color: var(--color-text-offset);
+}
+
+.sr-query strong { color: var(--color-text); }
+
+.sr-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-offset);
+  font-size: 16px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  transition: background 0.15s, color 0.15s;
+}
+.sr-close:hover { background: var(--color-background-offset); color: var(--color-text); }
+
+.sr-list { list-style: none; overflow-y: auto; }
+
+.sr-item { border-bottom: 1px solid var(--color-border); }
+.sr-item:last-child { border-bottom: none; }
+
+.sr-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0.875rem 1.25rem;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+.sr-link:hover { background: var(--color-background-offset); }
+
+.sr-thumb {
+  width: 56px; height: 42px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+.sr-thumb-placeholder {
+  width: 56px; height: 42px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-primary) 12%, var(--color-background-offset));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.25rem; font-weight: 700;
+  color: var(--color-primary); flex-shrink: 0;
+}
+
+.sr-text {
+  display: flex; flex-direction: column; gap: 2px; min-width: 0;
+}
+.sr-cat {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--color-primary);
+}
+.sr-title {
+  font-size: 14px; font-weight: 600; color: var(--color-text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sr-desc {
+  font-size: 12px; color: var(--color-text-offset);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.sr-empty { padding: 2rem; text-align: center; color: var(--color-text-offset); font-size: 14px; }
+</style>
