@@ -8,6 +8,8 @@ import sitemap from '@astrojs/sitemap';
 export default defineConfig({
   site: 'https://calligra.dev',
   base: '/',
-  outDir: '../calligra.dev',
+  build: {
+      emptyOutDir: false,
+  },
   integrations: [tailwind(), icon(), mdx(), sitemap()]
 });
