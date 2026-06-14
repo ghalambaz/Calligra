@@ -18,7 +18,7 @@ This repository powers the live production site at [calligra.dev](https://callig
 
 ## 🚀 Features
 
-- **Write Once, Publish Anywhere:** Built-in automation scripts and workflows to effortlessly cross-post your Markdown articles to Medium, Dev.to, and Hashnode.
+- **Write Once, Publish Anywhere:** Planned automation workflows for cross-posting Markdown articles to Medium, Dev.to, and Hashnode.
 - **Modern Stack:** Built with [Astro](https://astro.build/) for ultimate speed and styled with [Tailwind CSS](https://tailwindcss.com/) for easy customization.
 - **Enhanced Blog Engine:** Extended from the base theme to include native Search, Categories, and Tags, plus a dynamic homepage widget showcasing your latest posts.
 - **Performance First:** Lightweight architecture delivering outstanding Lighthouse/PageSpeed scores, fully responsive layouts, and built-in SEO optimization.
@@ -57,26 +57,24 @@ Open http://localhost:4321 in your browser to view the site.
 | `make build` | build your production site, put content to the output directory |
 | `make deploy` | Push your production content to the remote repo (github pages) |
 
-# Crossposting Automation Commands
+# Crossposting Automation
 
-This project uses a `Makefile` to simplify and wrap the underlying `npm run crosspost` CLI commands. Instead of typing out long flags, you can use short, memorable `make` targets.
+Crossposting automation is planned for a future release. The commands below document the intended workflow so the feature can be added without changing the README structure later.
 
-## Quick Reference Table
+## Command Table
 
-| Command | Description | Required Arguments |
-| :--- | :--- | :--- |
-| `make publish` | Scan all posts; process changed ones. | None |
-| `make publish-one` | Force process a specific post. | `slug` |
-| `make set-meta` | Modify frontmatter for a specific post. | `slug`, `key`, `value` |
-| `make hash-show` | View all tracking hashes and status. | None |
-| `make hash-reset` | Reset cache hash for one specific post. | `slug` |
-| `make hash-reset-all`| Reset cache hashes for all posts. | None |
+| Command | Description | Required Arguments | Status |
+| :--- | :--- | :--- | :--- |
+| `make publish` | Scan all posts; process changed ones. | None | Planned |
+| `make publish-one` | Force process a specific post. | `slug` | Planned |
+| `make set-meta` | Modify frontmatter for a specific post. | `slug`, `key`, `value` | Planned |
+| `make hash-show` | View all tracking hashes and status. | None | Planned |
+| `make hash-reset` | Reset cache hash for one specific post. | `slug` | Planned |
+| `make hash-reset-all` | Reset cache hashes for all posts. | None | Planned |
 
+## Notes
 
-
-📝 Multi-Publishing Automation
-
-## //TODO Update Content
+These commands are not active yet. When the automation layer lands, the same table can be updated with implementation details and usage examples.
 
 ⚖️ License & Acknowledgments
 
