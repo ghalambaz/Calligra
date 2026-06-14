@@ -4,14 +4,14 @@ import type { CollectionEntry } from 'astro:content';
 import Layout from '../../layouts/Layout.astro';
 
 export const getStaticPaths = async () => {
-    const blogs = await getCollection('blogs');
-    return blogs.map(blog => ({
+    const blog = await getCollection('blog');
+    return blog.map(blog => ({
         params: { slug: blog.slug },
         props: { blog }
     }));
 }
 
-type Props = { blog: CollectionEntry<'blogs'> }
+type Props = { blog: CollectionEntry<'blog'> }
 const { blog } = Astro.props;
 const { Content } = await blog.render();
 
@@ -31,11 +31,11 @@ const tags = blog.data.tags ?? [];
     <header class="post-header">
       <div class="container mx-auto max-w-3xl px-4 md:px-8">
         <div class="post-meta-top">
-          <a href={`/blogs/category/${category.toLowerCase().replace(/\s+/g,'-')}`} class="badge-cat">
+          <a href={`/blog/category/${category.toLowerCase().replace(/\s+/g,'-')}`} class="badge-cat">
             {category}
           </a>
           {tags.map(t => (
-            <a href={`/blogs/tag/${t}`} class="badge-tag">#{t}</a>
+            <a href={`/blog/tag/${t}`} class="badge-tag">#{t}</a>
           ))}
         </div>
         <h1 class="post-title">{blog.data.title}</h1>
@@ -67,10 +67,10 @@ const tags = blog.data.tags ?? [];
           <span class="tags-label">Tagged in</span>
           <div class="tags-list">
             {tags.map(t => (
-              <a href={`/blogs/tag/${t}`} class="badge-tag">#{t}</a>
+              <a href={`/blog/tag/${t}`} class="badge-tag">#{t}</a>
             ))}
           </div>
-          <a href="/blogs" class="back-link">← Back to all posts</a>
+          <a href="/blog" class="back-link">← Back to all posts</a>
         </footer>
       )}
     </div>

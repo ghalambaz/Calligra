@@ -1,8 +1,8 @@
 ---
 import { getCollection } from 'astro:content';
 
-const allBlogs = await getCollection('blogs');
-const latest = allBlogs
+const allBlog = await getCollection('blog');
+const latest = allBlog
   .sort((a, b) => new Date(b.data.datetime).getTime() - new Date(a.data.datetime).getTime())
   .slice(0, 3);
 
@@ -27,7 +27,7 @@ const formatDate = (d: string) => new Date(d).toLocaleDateString('en-US', {
       {latest.map((post, i) => (
         <article class:list={['post-card', { 'post-card--featured': i === 0 }]}>
           {post.data.image && (
-            <a href={`/blogs/${post.slug}`} class="card-img-link" tabindex="-1" aria-hidden="true">
+            <a href={`/blog/${post.slug}`} class="card-img-link" tabindex="-1" aria-hidden="true">
               <img
                 src={post.data.image}
                 alt={post.data.title}
@@ -39,7 +39,7 @@ const formatDate = (d: string) => new Date(d).toLocaleDateString('en-US', {
           <div class="card-body">
             <div class="card-meta">
               {post.data.category && (
-                <a href={`/blogs/category/${post.data.category.toLowerCase().replace(/\s+/g,'-')}`} class="cat-badge">
+                <a href={`/blog/category/${post.data.category.toLowerCase().replace(/\s+/g,'-')}`} class="cat-badge">
                   {post.data.category}
                 </a>
               )}
@@ -47,7 +47,7 @@ const formatDate = (d: string) => new Date(d).toLocaleDateString('en-US', {
                 <span class="tag-badge">#{t}</span>
               ))}
             </div>
-            <a href={`/blogs/${post.slug}`} class="card-title-link">
+            <a href={`/blog/${post.slug}`} class="card-title-link">
               <h3 class="card-title">{post.data.title}</h3>
             </a>
             <p class="card-desc">{post.data.description}</p>
@@ -58,7 +58,7 @@ const formatDate = (d: string) => new Date(d).toLocaleDateString('en-US', {
     </div>
 
     <div class="section-footer">
-      <a href="/blogs" class="all-posts-btn">
+      <a href="/blog" class="all-posts-btn">
         View all posts
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
           <path d="M5 12h14M12 5l7 7-7 7"/>

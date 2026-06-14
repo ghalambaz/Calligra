@@ -3,11 +3,11 @@ import type { Blog } from '../../../types/BlogType';
 import BlogItem from './BlogItem.astro';
 
 interface Props {
-  blogs: Blog[];
+  blog: Blog[];
 }
 
-const { blogs } = Astro.props;
-const [hero, ...rest] = blogs;
+const { blog } = Astro.props;
+const [hero, ...rest] = blog;
 ---
 
 <section class="blog-list-section">

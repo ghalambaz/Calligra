@@ -44,6 +44,6 @@
     "projects": [],
     "menuItems": [
         { "name": "About", "link": "/" },
-        { "name": "Blog", "link": "/blogs" }
+        { "name": "Blog", "link": "/blog" }
     ]
 }

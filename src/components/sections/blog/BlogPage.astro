@@ -8,7 +8,7 @@ import type { Page } from 'astro';
 import type { CollectionEntry } from 'astro:content';
 
 export interface Props {
-  page: Page<CollectionEntry<'blogs'>>;
+  page: Page<CollectionEntry<'blog'>>;
   activeCategory?: string;
   activeTag?: string;
 }
@@ -16,7 +16,7 @@ export interface Props {
 const { page, activeCategory, activeTag } = Astro.props;
 
 // Collect all posts for search + sidebar
-const allPosts = await getCollection('blogs');
+const allPosts = await getCollection('blog');
 const categories = [...new Set(allPosts.map(p => p.data.category).filter(Boolean))].sort() as string[];
 const tags = [...new Set(allPosts.map(p => p.data.tags).filter(Boolean).flat())].sort() as string[];
 
@@ -40,7 +40,7 @@ const searchIndex = allPosts.map(p => ({
     activeCategory={activeCategory}
     activeTag={activeTag}
   />
-  <BlogList blogs={(page?.data ?? []) as any} />
+  <BlogList blog={(page?.data ?? []) as any} />
   <div class="container mx-auto px-4 max-w-4xl pb-8">
     <Pagination page={page} />
   </div>
@@ -87,7 +87,7 @@ function renderResults(query) {
         <ul class="sr-list">
           ${hits.map(p => `
             <li class="sr-item">
-              <a href="/blogs/${p.slug}" class="sr-link">
+              <a href="/blog/${p.slug}" class="sr-link">
                 ${p.image ? `<img src="${p.image}" alt="" class="sr-thumb" loading="lazy"/>` : `<div class="sr-thumb-placeholder">${p.title.charAt(0)}</div>`}
                 <div class="sr-text">
                   <span class="sr-cat">${p.category ?? ''}</span>

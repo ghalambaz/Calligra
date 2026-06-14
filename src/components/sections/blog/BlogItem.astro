@@ -11,7 +11,7 @@ const { blog, isHero = false } = Astro.props;
 const date = new Date(blog.data.datetime).toLocaleDateString('en-US', {
   year: 'numeric', month: 'long', day: 'numeric'
 });
-const slug = `/blogs/${blog.slug}`;
+const slug = `/blog/${blog.slug}`;
 const category = blog.data.category ?? 'General';
 const tags = blog.data.tags ?? [];
 ---
@@ -32,12 +32,12 @@ const tags = blog.data.tags ?? [];
 
     <div class="hero-body">
       <div class="hero-meta">
-        <a href={`/blogs/category/${category.toLowerCase().replace(/\s+/g,'-')}`} class="badge badge-cat">
+        <a href={`/blog/category/${category.toLowerCase().replace(/\s+/g,'-')}`} class="badge badge-cat">
           {category}
         </a>
         <span class="badge badge-new">Latest</span>
         {tags.slice(0,2).map(t => (
-          <a href={`/blogs/tag/${t}`} class="badge badge-tag">#{t}</a>
+          <a href={`/blog/tag/${t}`} class="badge badge-tag">#{t}</a>
         ))}
       </div>
       <a href={slug} class="hero-title-link">
@@ -55,11 +55,11 @@ const tags = blog.data.tags ?? [];
   <article class="post-card">
     <div class="post-body">
       <div class="post-meta">
-        <a href={`/blogs/category/${category.toLowerCase().replace(/\s+/g,'-')}`} class="badge badge-cat">
+        <a href={`/blog/category/${category.toLowerCase().replace(/\s+/g,'-')}`} class="badge badge-cat">
           {category}
         </a>
         {tags.slice(0,2).map(t => (
-          <a href={`/blogs/tag/${t}`} class="badge badge-tag">#{t}</a>
+          <a href={`/blog/tag/${t}`} class="badge badge-tag">#{t}</a>
         ))}
       </div>
       <a href={slug} class="post-title-link">
