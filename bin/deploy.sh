@@ -52,4 +52,4 @@ else
   fi
 fi
 
-echo "🚀 Deployment finished!
+echo "🚀 Deployment finished!"

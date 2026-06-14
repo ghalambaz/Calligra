@@ -63,7 +63,9 @@ Open http://localhost:4321 in your browser to view the site.
 ## //TODO Update Content
 
 ⚖️ License & Acknowledgments
-This project is open-source software licensed under the MIT License.
 
-Credits
+- **Source Code:** The source code of this website is licensed under the [MIT License](LICENSE).
+- **Content & Articles:** All written content, articles, and media found under the `src/content/` directory are licensed under the [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)](src/content/LICENSE-CONTENT)
+
+## Credits
 Calligra is built as an extended variant of the astro-resume-theme created by Wasut Panyawiphat, which is also distributed under the MIT License. I am incredibly grateful for their foundational work.
