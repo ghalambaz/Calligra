@@ -1,19 +1,24 @@
 ---
 import { getCollection } from 'astro:content';
+import { render } from 'astro:content';
 import type { CollectionEntry } from 'astro:content';
 import Layout from '../../layouts/Layout.astro';
 
 export const getStaticPaths = async () => {
     const blog = await getCollection('blog');
-    return blog.map(blog => ({
-        params: { slug: blog.slug },
-        props: { blog }
-    }));
+    return blog.map(item => {
+        const cleanSlug = item.id.replace(/\.mdx?$/, '');
+        
+        return {
+            params: { slug: cleanSlug },
+            props: { blog: item }
+        };
+    });
 }
 
 type Props = { blog: CollectionEntry<'blog'> }
 const { blog } = Astro.props;
-const { Content } = await blog.render();
+const { Content } = await render(blog);
 
 const date = new Date(blog.data.datetime).toLocaleDateString('en-US', {
   year: 'numeric', month: 'long', day: 'numeric'

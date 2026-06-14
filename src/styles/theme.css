@@ -5,7 +5,7 @@
     --color-text-offset: theme("colors.gray.600");
     --color-background: #F2F2F2;
     --color-background-offset:  #FAF9F6;
-    --color-border: theme("colors.gray.900" / 10%);
+    --color-border: rgba(17, 24, 39, 0.1);
 }
 
 [data-theme="dark"] {
@@ -15,5 +15,11 @@
     --color-text-offset: theme("colors.gray.400");
     --color-background: theme("colors.gray.900");
     --color-background-offset: theme("colors.gray.800");
-    --color-border: theme("colors.gray.50" / 10%);
+    --color-border: rgba(249, 250, 251, 0.1);
+}
+
+html,
+body {
+    background-color: var(--color-background);
+    color: var(--color-text);
 }

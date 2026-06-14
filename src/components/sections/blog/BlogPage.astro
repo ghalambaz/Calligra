@@ -19,10 +19,11 @@ const { page, activeCategory, activeTag } = Astro.props;
 const allPosts = await getCollection('blog');
 const categories = [...new Set(allPosts.map(p => p.data.category).filter(Boolean))].sort() as string[];
 const tags = [...new Set(allPosts.map(p => p.data.tags).filter(Boolean).flat())].sort() as string[];
+const getSlug = (id: string) => id.replace(/\.mdx?$/, '');
 
 // Serialize all posts for client-side search
 const searchIndex = allPosts.map(p => ({
-  slug: p.slug,
+  slug: getSlug(p.id),
   title: p.data.title,
   description: p.data.description,
   category: p.data.category,

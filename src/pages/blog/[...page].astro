@@ -6,14 +6,23 @@ import BlogPage from '../../components/sections/blog/BlogPage.astro';
 
 export async function getStaticPaths({ paginate }) {
     const blog = await getCollection('blog');
-    const latestBlog = blog.sort((a, b) =>
+    
+    // 1. Sort your entries by date
+    const sortedBlog = blog.sort((a, b) =>
         new Date(b.data.datetime).getTime() - new Date(a.data.datetime).getTime()
     );
+
+    // 2. Pre-clean the slugs so your component receives clean IDs without extensions
+    const latestBlog = sortedBlog.map(post => ({
+        ...post,
+        id: post.id.replace(/\.mdx?$/, '')
+    }));
+
     return paginate(latestBlog, { pageSize: 5 });
 }
 
 export interface Props {
-  page: Page<CollectionEntry<'blog'>>;
+    page: Page<CollectionEntry<'blog'>>;
 }
 
 const { page } = Astro.props;

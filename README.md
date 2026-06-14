@@ -51,19 +51,28 @@ Open http://localhost:4321 in your browser to view the site.
 
 ## 🧞 Commands
 
-| Command | Action |
-| :--- | :--- |
-| `npm install` | Installs dependencies |
-| `npm run dev` | Starts local dev server at `localhost:4321` |
-| `npm run build` | Builds your production site to `./dist/` |
-| `npm run preview` | Previews your production build locally |
-
-
 | Make | Action |
 | :--- | :--- |
 | `make run` | Starts local dev server at `localhost:4321`|
 | `make build` | build your production site, put content to the output directory |
 | `make deploy` | Push your production content to the remote repo (github pages) |
+
+# Crossposting Automation Commands
+
+This project uses a `Makefile` to simplify and wrap the underlying `npm run crosspost` CLI commands. Instead of typing out long flags, you can use short, memorable `make` targets.
+
+## Quick Reference Table
+
+| Command | Description | Required Arguments |
+| :--- | :--- | :--- |
+| `make publish` | Scan all posts; process changed ones. | None |
+| `make publish-one` | Force process a specific post. | `slug` |
+| `make set-meta` | Modify frontmatter for a specific post. | `slug`, `key`, `value` |
+| `make hash-show` | View all tracking hashes and status. | None |
+| `make hash-reset` | Reset cache hash for one specific post. | `slug` |
+| `make hash-reset-all`| Reset cache hashes for all posts. | None |
+
+
 
 📝 Multi-Publishing Automation
 

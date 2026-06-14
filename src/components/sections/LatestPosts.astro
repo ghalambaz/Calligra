@@ -6,6 +6,8 @@ const latest = allBlog
   .sort((a, b) => new Date(b.data.datetime).getTime() - new Date(a.data.datetime).getTime())
   .slice(0, 3);
 
+const getSlug = (id: string) => id.replace(/\.mdx?$/, '');
+
 const formatDate = (d: string) => new Date(d).toLocaleDateString('en-US', {
   year: 'numeric', month: 'short', day: 'numeric'
 });
@@ -27,7 +29,7 @@ const formatDate = (d: string) => new Date(d).toLocaleDateString('en-US', {
       {latest.map((post, i) => (
         <article class:list={['post-card', { 'post-card--featured': i === 0 }]}>
           {post.data.image && (
-            <a href={`/blog/${post.slug}`} class="card-img-link" tabindex="-1" aria-hidden="true">
+            <a href={`/blog/${getSlug(post.id)}`} class="card-img-link" tabindex="-1" aria-hidden="true">
               <img
                 src={post.data.image}
                 alt={post.data.title}
@@ -47,7 +49,7 @@ const formatDate = (d: string) => new Date(d).toLocaleDateString('en-US', {
                 <span class="tag-badge">#{t}</span>
               ))}
             </div>
-            <a href={`/blog/${post.slug}`} class="card-title-link">
+            <a href={`/blog/${getSlug(post.id)}`} class="card-title-link">
               <h3 class="card-title">{post.data.title}</h3>
             </a>
             <p class="card-desc">{post.data.description}</p>

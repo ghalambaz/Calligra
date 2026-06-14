@@ -11,13 +11,14 @@ const { blog, isHero = false } = Astro.props;
 const date = new Date(blog.data.datetime).toLocaleDateString('en-US', {
   year: 'numeric', month: 'long', day: 'numeric'
 });
-const slug = `/blog/${blog.slug}`;
+
+const slug = `/blog/${blog.id.replace(/\.mdx?$/, '')}`;
+
 const category = blog.data.category ?? 'General';
 const tags = blog.data.tags ?? [];
 ---
 
 {isHero ? (
-  <!-- ── HERO CARD (latest post, image on top) ── -->
   <article class="hero-card">
     <a href={slug} class="hero-img-link" tabindex="-1" aria-hidden="true">
       {blog.data.image ? (
@@ -51,7 +52,6 @@ const tags = blog.data.tags ?? [];
     </div>
   </article>
 ) : (
-  <!-- ── REGULAR CARD (image on right) ── -->
   <article class="post-card">
     <div class="post-body">
       <div class="post-meta">

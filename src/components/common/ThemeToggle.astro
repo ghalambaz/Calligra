@@ -29,5 +29,6 @@ import { Icon } from 'astro-icon/components'
         toggleMarkdownTheme(newTheme);
     });
 
+    toggleMarkdownTheme(getCurrentTheme() || 'light');
     updateToggleThemeIcon();
 </script>
