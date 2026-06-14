@@ -5,6 +5,7 @@ import { Client } from '@notionhq/client';
 import { NotionToMarkdown } from 'notion-to-md';
 import * as fs from 'fs';
 import * as path from 'path';
+import { pipeline } from 'stream/promises';
 
 dotenv.config();
 
@@ -26,11 +27,52 @@ const notion = new Client({ auth: NOTION_TOKEN });
 const n2m = new NotionToMarkdown({ notionClient: notion });
 const DATABASE_ID = NOTION_DATABASE_ID;
 
+// Define base root paths
+const POSTS_DIR = path.join(process.cwd(), 'src/content/blog');
+const IMAGES_BASE_DIR = path.join(process.cwd(), 'public/images/blog');
+
+// Ensure base directories exist
+if (!fs.existsSync(POSTS_DIR)) fs.mkdirSync(POSTS_DIR, { recursive: true });
+if (!fs.existsSync(IMAGES_BASE_DIR)) fs.mkdirSync(IMAGES_BASE_DIR, { recursive: true });
+
+/**
+ * Downloads a binary file from a source URL and writes it locally into a scoped folder per blog post.
+ * Returns the public web path string matching Astro asset rendering mechanics.
+ */
+async function downloadAsset(url, postSlug, filename) {
+  try {
+    // 💡 Setup a dedicated sub-directory path for this specific blog post
+    const postImagesDirectory = path.join(IMAGES_BASE_DIR, postSlug);
+    if (!fs.existsSync(postImagesDirectory)) {
+      fs.mkdirSync(postImagesDirectory, { recursive: true });
+    }
+
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP network error: ${response.statusText}`);
+
+    const contentType = response.headers.get('content-type');
+    let ext = '.png';
+    if (contentType?.includes('image/jpeg')) ext = '.jpg';
+    if (contentType?.includes('image/webp')) ext = '.webp';
+    if (contentType?.includes('image/gif')) ext = '.gif';
+
+    const cleanFilename = `${filename}${ext}`;
+    const destinationPath = path.join(postImagesDirectory, cleanFilename);
+
+    await pipeline(response.body, fs.createWriteStream(destinationPath));
+    
+    // 💡 Returns clean public-facing URL path, referencing the newly created subfolder
+    return `/images/blog/${postSlug}/${cleanFilename}`;
+  } catch (err) {
+    console.error(`⚠️ Failed to download file [${url}]:`, err.message);
+    return url; // Graceful degradation fallback
+  }
+}
+
 function getProperty(properties, candidates) {
   for (const key of candidates) {
     if (properties[key]) return properties[key];
   }
-
   return null;
 }
 
@@ -81,8 +123,9 @@ async function syncPosts() {
 
   for (const page of pages) {
     const props = page.properties;
-    const readyToPublish = getProperty(props, ['status', 'Status']).status.name == PUBLISH_DOC_STATUS ? true: false;
-    if (!readyToPublish) continue; // Skip if not ready to publish
+    const statusProperty = getProperty(props, ['status', 'Status']);
+    const readyToPublish = statusProperty?.status?.name === PUBLISH_DOC_STATUS;
+    if (!readyToPublish) continue; 
 
     const title = getTitle(props);
     const description = getProperty(props, ['description', 'Description'])?.rich_text?.[0]?.plain_text ?? '';
@@ -94,11 +137,34 @@ async function syncPosts() {
     const datetime = getProperty(props, ['datetime', 'Datetime', 'date'])?.date?.start ?? new Date().toISOString();
     const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
-    // 2. Fetch the page content and convert to markdown
+    console.log(`Processing content: "${title}"...`);
+
+    // 1. Process and Download Page Cover into its dedicated subfolder
+    let coverImagePath = '';
+    if (page.cover) {
+      const originalCoverUrl = page.cover.type === 'file' ? page.cover.file.url : page.cover.external.url;
+      // 💡 Pass the slug to group the assets within their own bundle folder
+      coverImagePath = await downloadAsset(originalCoverUrl, slug, 'cover');
+    }
+
+    // 2. Set up inline image downloader logic inside notion-to-md context 
+    let blockImageCounter = 0;
+    n2m.setCustomTransformer('image', async (block) => {
+      const imageUrl = block.image.type === 'file' ? block.image.file.url : block.image.external.url;
+      const caption = block.image.caption?.[0]?.plain_text || '';
+      
+      blockImageCounter++;
+      // 💡 Group inline assets together with the main banner cover
+      const localImagePath = await downloadAsset(imageUrl, slug, `asset-${blockImageCounter}`);
+      
+      return `![${caption || 'Blog Asset'}](${localImagePath})`;
+    });
+
+    // 3. Fetch content blocks and convert
     const mdblocks = await n2m.pageToMarkdown(page.id);
     const mdString = n2m.toMarkdownString(mdblocks);
 
-    // 3. Construct Astro-compliant Frontmatter
+    // 4. Construct Astro Frontmatter with clean local relative cover paths
     const frontmatter = `---
 title: "${title}"
 description: "${description}"
@@ -108,15 +174,16 @@ time_to_read: ${timeToRead}
 level: "${level}"
 tags: ${JSON.stringify(tags)}
 datetime: "${datetime}"
+image: "${coverImagePath}"
 ---
 
 `;
 
     const fullContent = frontmatter + mdString.parent;
-    const outputPath = path.join(process.cwd(), 'src/content/blog', `${slug}.mdx`);
+    const outputPath = path.join(POSTS_DIR, `${slug}.mdx`);
     
     fs.writeFileSync(outputPath, fullContent);
-    console.log(`Synced: ${slug}`);
+    console.log(`Successfully completed build for: ${slug}.mdx`);
   }
 }
 
