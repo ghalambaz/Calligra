@@ -18,7 +18,7 @@ This repository powers the live production site at [calligra.dev](https://callig
 
 ## 🚀 Features
 
-- **Write Once, Publish Anywhere:** Planned automation workflows for cross-posting Markdown articles to Medium, Dev.to, and Hashnode.
+- **Write Once, Publish Anywhere:** Automation workflows for syncing content from Notion and cross-posting Markdown articles to Medium, Dev.to, and Hashnode.
 - **Modern Stack:** Built with [Astro](https://astro.build/) for ultimate speed and styled with [Tailwind CSS](https://tailwindcss.com/) for easy customization.
 - **Enhanced Blog Engine:** Extended from the base theme to include native Search, Categories, and Tags, plus a dynamic homepage widget showcasing your latest posts.
 - **Performance First:** Lightweight architecture delivering outstanding Lighthouse/PageSpeed scores, fully responsive layouts, and built-in SEO optimization.
@@ -55,26 +55,30 @@ Open http://localhost:4321 in your browser to view the site.
 | :--- | :--- |
 | `make run` | Starts local dev server at `localhost:4321`|
 | `make build` | build your production site, put content to the output directory |
+| `make sync` | Pull content from Notion and generate Markdown posts |
 | `make deploy` | Push your production content to the remote repo (github pages) |
 
-# Crossposting Automation
+# Content Sync and Crossposting Automation
 
-Crossposting automation is planned for a future release. The commands below document the intended workflow so the feature can be added without changing the README structure later.
+The project includes a Notion sync command and a set of make targets for crossposting posts to external platforms.
 
 ## Command Table
 
 | Command | Description | Required Arguments | Status |
 | :--- | :--- | :--- | :--- |
-| `make publish` | Scan all posts; process changed ones. | None | Planned |
-| `make publish-one` | Force process a specific post. | `slug` | Planned |
-| `make set-meta` | Modify frontmatter for a specific post. | `slug`, `key`, `value` | Planned |
-| `make hash-show` | View all tracking hashes and status. | None | Planned |
-| `make hash-reset` | Reset cache hash for one specific post. | `slug` | Planned |
-| `make hash-reset-all` | Reset cache hashes for all posts. | None | Planned |
+| `make sync` | Pull posts from Notion and write them to `src/content/blog`. | `NOTION_TOKEN`, `NOTION_DATABASE_ID` | Ready |
+| `make publish` | Scan all posts; process changed ones. | None | Ready |
+| `make publish-one` | Force process a specific post. | `slug` | Ready |
+| `make set-meta` | Modify frontmatter for a specific post. | `slug`, `key`, `value` | Ready |
+| `make hash-show` | View all tracking hashes and status. | None | Ready |
+| `make hash-reset` | Reset cache hash for one specific post. | `slug` | Ready |
+| `make hash-reset-all` | Reset cache hashes for all posts. | None | Ready |
 
 ## Notes
 
-These commands are not active yet. When the automation layer lands, the same table can be updated with implementation details and usage examples.
+`make sync` reads `NOTION_TOKEN` and `NOTION_DATABASE_ID` from your environment before generating posts.
+
+`make publish` and the other crossposting targets are available now through the `bin/crosspost` script.
 
 ⚖️ License & Acknowledgments
 

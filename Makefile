@@ -19,35 +19,39 @@ run:
 build:
 	@bash ./bin/build.sh
 
+## sync: Fetch content from Notion or other sources and convert to markdown files
+sync:
+	node bin/sync-notion
+
 ## deploy: built content to your remote repo
 deploy:
 	@bash ./bin/deploy.sh
 
 ## publish: Scan all posts and process only changed ones
 publish:
-	npm run crosspost
+	./bin/crosspost
 
 ## publish-one: Force process one specific post (requires slug=...)
 publish-one:
 	$(call require-var,slug)
-	npm run crosspost -- --slug $(slug)
+	./bin/crosspost -- --slug $(slug)
 
 ## set-meta: Set frontmatter value (requires slug=..., key=..., value=...)
 set-meta:
 	$(call require-var,slug)
 	$(call require-var,key)
 	$(call require-var,value)
-	npm run crosspost -- --set $(slug) $(key)=$(value)
+	./bin/crosspost -- --set $(slug) $(key)=$(value)
 
 ## hash-show: See all hashes and change status
 hash-show:
-	npm run crosspost -- --hash-show
+	./bin/crosspost -- --hash-show
 
 ## hash-reset: Force reprocess one post next run (requires slug=...)
 hash-reset:
 	$(call require-var,slug)
-	npm run crosspost -- --hash-reset $(slug)
+	./bin/crosspost -- --hash-reset $(slug)
 
 ## hash-reset-all: Force reprocess everything next run
 hash-reset-all:
-	npm run crosspost -- --hash-reset-all
+	./bin/crosspost -- --hash-reset-all

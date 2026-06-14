@@ -1,0 +1,452 @@
+#!/usr/bin/env node
+/**
+ * crosspost.js — Cross-post blog articles to Dev.to, Hashnode, and Medium.
+ *
+ * USAGE
+ * ─────
+ * npm run crosspost                       # scan all changed posts
+ * npm run crosspost -- --slug <slug>      # process one specific post
+ *
+ * HASH MANAGEMENT
+ * ───────────────
+ * npm run crosspost -- --hash-reset <slug>          # force reprocess a post next run
+ * npm run crosspost -- --hash-reset-all             # force reprocess all posts next run
+ * npm run crosspost -- --hash-show                  # show all stored hashes
+ *
+ * FRONTMATTER MANAGEMENT
+ * ──────────────────────
+ * npm run crosspost -- --set <slug> published=true
+ * npm run crosspost -- --set <slug> published=false
+ * npm run crosspost -- --set <slug> devto_id=null
+ *
+ * REQUIREMENTS
+ * ────────────
+ * - DEVTO_API_KEY in .env
+ * - Posts in src/content/blog/<slug>.md or .mdx
+ * - Exports written to src/content/export/
+ * - Hashes stored in src/content/export/.hashes.json
+ *
+ * DEPENDENCIES (already in Astro projects)
+ * ─────────────────────────────────────────
+ * npm install gray-matter marked dotenv
+ */
+
+import fs from "fs";
+import path from "path";
+import crypto from "crypto";
+import matter from "gray-matter";
+import { marked } from "marked";
+import dotenv from "dotenv";
+
+dotenv.config();
+
+// ─── Config ──────────────────────────────────────────────────────────────────
+
+const BLOG_DIR    = path.resolve("src/content/blog");
+const EXPORT_DIR  = path.resolve("src/content/export");
+const HASHES_FILE = path.join(EXPORT_DIR, ".hashes.json");
+const BASE_URL    = process.env.SITE_URL + "/blog";
+const DEVTO_API   = "https://dev.to/api/articles";
+
+// ─── CLI args ─────────────────────────────────────────────────────────────────
+
+const args = process.argv.slice(2);
+
+function getArg(flag) {
+  const idx = args.indexOf(flag);
+  return idx !== -1 ? args[idx + 1] ?? true : null;
+}
+
+const MODE_SLUG        = getArg("--slug");
+const MODE_SET         = getArg("--set");
+const MODE_HASH_RESET  = getArg("--hash-reset");
+const MODE_HASH_ALL    = args.includes("--hash-reset-all");
+const MODE_HASH_SHOW   = args.includes("--hash-show");
+
+// ─── Logging ─────────────────────────────────────────────────────────────────
+
+const log  = (emoji, msg) => console.log(`${emoji}  ${msg}`);
+const warn = (msg)        => console.warn(`⚠️   ${msg}`);
+const sep  = ()           => console.log("━".repeat(52));
+
+function bail(msg) {
+  console.error(`❌  ${msg}`);
+  process.exit(1);
+}
+
+// ─── File helpers ─────────────────────────────────────────────────────────────
+
+function ensureExportDir() {
+  if (!fs.existsSync(EXPORT_DIR)) {
+    fs.mkdirSync(EXPORT_DIR, { recursive: true });
+    log("📁", `Created: ${EXPORT_DIR}`);
+  }
+}
+
+function findPostFile(slug) {
+  for (const ext of [".md", ".mdx"]) {
+    const p = path.join(BLOG_DIR, `${slug}${ext}`);
+    if (fs.existsSync(p)) return p;
+  }
+  bail(`No file found for slug "${slug}" in ${BLOG_DIR}`);
+}
+
+function getAllSlugs() {
+  if (!fs.existsSync(BLOG_DIR)) bail(`Blog directory not found: ${BLOG_DIR}`);
+  return fs.readdirSync(BLOG_DIR)
+    .filter(f => f.endsWith(".md") || f.endsWith(".mdx"))
+    .map(f => f.replace(/\.(md|mdx)$/, ""));
+}
+
+// ─── Hash helpers ─────────────────────────────────────────────────────────────
+
+function loadHashes() {
+  if (!fs.existsSync(HASHES_FILE)) return {};
+  try { return JSON.parse(fs.readFileSync(HASHES_FILE, "utf-8")); }
+  catch { return {}; }
+}
+
+function saveHashes(hashes) {
+  ensureExportDir();
+  fs.writeFileSync(HASHES_FILE, JSON.stringify(hashes, null, 2), "utf-8");
+}
+
+function hashFile(filePath) {
+  const content = fs.readFileSync(filePath, "utf-8");
+  return crypto.createHash("sha256").update(content).digest("hex");
+}
+
+function hasChanged(slug, filePath, hashes) {
+  const current = hashFile(filePath);
+  return hashes[slug] !== current;
+}
+
+// ─── Frontmatter helpers ──────────────────────────────────────────────────────
+
+function readPost(filePath) {
+  const raw = fs.readFileSync(filePath, "utf-8");
+  const { data, content } = matter(raw);
+  return { raw, frontmatter: data, content };
+}
+
+/**
+ * Write a single frontmatter key=value back into the file.
+ * Handles: strings, numbers, booleans, null.
+ */
+function writeFrontmatterKey(filePath, key, value) {
+  const raw = fs.readFileSync(filePath, "utf-8");
+
+  // Serialize value for YAML
+  let yamlVal;
+  if (value === null)        yamlVal = "null";
+  else if (value === true)   yamlVal = "true";
+  else if (value === false)  yamlVal = "false";
+  else if (typeof value === "number") yamlVal = String(value);
+  else yamlVal = `"${value}"`;
+
+  // Replace existing key or append before closing ---
+  const keyPattern = new RegExp(`^(${key}:\\s*).*$`, "m");
+  let updated;
+  if (keyPattern.test(raw)) {
+    updated = raw.replace(keyPattern, `${key}: ${yamlVal}`);
+  } else {
+    // Insert before the closing --- of frontmatter
+    updated = raw.replace(/^---\s*$/m, `${key}: ${yamlVal}\n---`);
+  }
+
+  fs.writeFileSync(filePath, updated, "utf-8");
+}
+
+/** Remove Astro-specific MDX imports and JSX component tags */
+function stripAstroSyntax(content) {
+  return content
+    .replace(/^import\s+.*from\s+['"].*['"]\s*;?\s*$/gm, "")
+    .replace(/<[A-Z][A-Za-z0-9]*[^>]*\/>/g, "")
+    .replace(/<\/?[A-Z][A-Za-z0-9]*[^>]*>/g, "")
+    .trim();
+}
+
+/** Normalize tags to Dev.to format: lowercase, no spaces, max 4 */
+function normalizeTags(tags) {
+  if (!Array.isArray(tags)) return [];
+  return tags.map(t => String(t).toLowerCase().replace(/\s+/g, "")).slice(0, 4);
+}
+
+// ─── Dev.to ───────────────────────────────────────────────────────────────────
+
+async function publishToDevto(filePath, slug, frontmatter, content) {
+  const DEVTO_API_KEY = process.env.DEVTO_API_KEY;
+  if (!DEVTO_API_KEY) bail("DEVTO_API_KEY is not set in your .env file.");
+
+  const canonicalUrl = `${BASE_URL}/${slug}`;
+  const existingId   = frontmatter.devto_id ?? null;
+  const isUpdate     = typeof existingId === "number";
+
+  const payload = {
+    article: {
+      title:         frontmatter.title,
+      body_markdown: content,
+      published:     frontmatter.published ?? false,
+      description:   frontmatter.description ?? "",
+      tags:          normalizeTags(frontmatter.tags),
+      canonical_url: canonicalUrl,
+    },
+  };
+
+  const url    = isUpdate ? `${DEVTO_API}/${existingId}` : DEVTO_API;
+  const method = isUpdate ? "PUT" : "POST";
+
+  log("🚀", `Dev.to: ${isUpdate ? `Updating article #${existingId}` : "Creating new article"}...`);
+
+  const res = await fetch(url, {
+    method,
+    headers: { "Content-Type": "application/json", "api-key": DEVTO_API_KEY },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    bail(`Dev.to API error ${res.status}: ${body}`);
+  }
+
+  const data = await res.json();
+
+  if (!isUpdate) {
+    writeFrontmatterKey(filePath, "devto_id", data.id);
+    log("✅", `Dev.to: Published! devto_id=${data.id} written to frontmatter.`);
+  } else {
+    log("✅", `Dev.to: Updated successfully.`);
+  }
+
+  log("🔗", `Dev.to URL: ${data.url}`);
+}
+
+// ─── Hashnode export ──────────────────────────────────────────────────────────
+
+function exportForHashnode(slug, frontmatter, content) {
+  const canonicalUrl = `${BASE_URL}/${slug}`;
+
+  const out = [
+    `---`,
+    `title: "${frontmatter.title}"`,
+    `description: "${frontmatter.description ?? ""}"`,
+    `tags: [${normalizeTags(frontmatter.tags).join(", ")}]`,
+    `canonical_url: "${canonicalUrl}"`,
+    `# ↑ Paste this URL into Hashnode > "Original article URL" before publishing`,
+    `---`,
+    ``,
+    content,
+  ].join("\n");
+
+  const outPath = path.join(EXPORT_DIR, `${slug}.hashnode.md`);
+  fs.writeFileSync(outPath, out, "utf-8");
+  log("✅", `Hashnode: ${slug}.hashnode.md`);
+  log("📋", `Hashnode canonical → ${canonicalUrl}`);
+}
+
+// ─── Medium export ────────────────────────────────────────────────────────────
+
+async function exportForMedium(slug, frontmatter, content) {
+  const canonicalUrl = `${BASE_URL}/${slug}`;
+  const bodyHtml     = await marked.parse(content);
+  const tags         = normalizeTags(frontmatter.tags).join(", ");
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>${frontmatter.title}</title>
+  <!--
+    MEDIUM INSTRUCTIONS
+    ══════════════════════════════════════
+    1. Open Medium > Write a story
+    2. Open this file in a browser, select all (Ctrl+A), copy, paste into Medium editor
+    3. Before publishing → "..." > "Change display title/subtitle"
+    4. Set "Originally published at": ${canonicalUrl}
+    5. Add tags: ${tags}
+    ══════════════════════════════════════
+  -->
+</head>
+<body>
+  <h1>${frontmatter.title}</h1>
+  ${bodyHtml}
+</body>
+</html>`;
+
+  const outPath = path.join(EXPORT_DIR, `${slug}.medium.html`);
+  fs.writeFileSync(outPath, html, "utf-8");
+  log("✅", `Medium: ${slug}.medium.html`);
+  log("📋", `Medium canonical → ${canonicalUrl}`);
+}
+
+// ─── Process one post ─────────────────────────────────────────────────────────
+
+async function processPost(slug, hashes) {
+  const filePath = findPostFile(slug);
+  const { frontmatter, content: rawContent } = readPost(filePath);
+
+  if (!frontmatter.title) {
+    warn(`Skipping "${slug}" — missing required frontmatter field: title`);
+    return false;
+  }
+
+  if (frontmatter.published === undefined) {
+    warn(`"${slug}" has no published field — defaulting to draft`);
+  }
+
+  const content = stripAstroSyntax(rawContent);
+
+  sep();
+  log("📄", `Processing: ${slug}`);
+  sep();
+
+  await publishToDevto(filePath, slug, frontmatter, content);
+  sep();
+  exportForHashnode(slug, frontmatter, content);
+  sep();
+  await exportForMedium(slug, frontmatter, content);
+
+  // Update hash AFTER processing (devto_id writeback changes file hash)
+  hashes[slug] = hashFile(filePath);
+  return true;
+}
+
+// ─── Mode: --set <slug> key=value ─────────────────────────────────────────────
+
+function runSet(slug, assignment) {
+  if (!assignment || !assignment.includes("=")) {
+    bail(`--set requires key=value format.\n   Example: --set ${slug} published=true`);
+  }
+
+  const eqIdx = assignment.indexOf("=");
+  const key   = assignment.slice(0, eqIdx).trim();
+  const raw   = assignment.slice(eqIdx + 1).trim();
+
+  // Parse value type
+  let value;
+  if (raw === "null")        value = null;
+  else if (raw === "true")   value = true;
+  else if (raw === "false")  value = false;
+  else if (!isNaN(Number(raw)) && raw !== "") value = Number(raw);
+  else value = raw;
+
+  const filePath = findPostFile(slug);
+  writeFrontmatterKey(filePath, key, value);
+
+  log("✅", `Set ${key}=${JSON.stringify(value)} in ${slug}`);
+  log("💡", `Hash cleared — this post will be reprocessed on next run.`);
+
+  // Clear hash so the change triggers reprocessing
+  const hashes = loadHashes();
+  delete hashes[slug];
+  saveHashes(hashes);
+}
+
+// ─── Mode: --hash-show ────────────────────────────────────────────────────────
+
+function runHashShow() {
+  const hashes = loadHashes();
+  const slugs  = Object.keys(hashes);
+
+  if (slugs.length === 0) {
+    log("📭", "No hashes stored yet — all posts will be processed on next run.");
+    return;
+  }
+
+  console.log("\n  Stored hashes:\n");
+  for (const [slug, hash] of Object.entries(hashes)) {
+    const filePath = path.join(BLOG_DIR, `${slug}.md`) || path.join(BLOG_DIR, `${slug}.mdx`);
+    const exists   = fs.existsSync(filePath) || fs.existsSync(filePath.replace(".md", ".mdx"));
+    const current  = exists ? hashFile(filePath) : null;
+    const changed  = current && current !== hash;
+    const status   = !exists ? "⚠️  file missing" : changed ? "🔄 changed" : "✓  up to date";
+    console.log(`  ${status.padEnd(18)} ${slug}`);
+    console.log(`  ${"".padEnd(18)} stored:  ${hash.slice(0, 16)}...`);
+    if (current) console.log(`  ${"".padEnd(18)} current: ${current.slice(0, 16)}...`);
+    console.log("");
+  }
+}
+
+// ─── Mode: --hash-reset / --hash-reset-all ───────────────────────────────────
+
+function runHashReset(slug) {
+  const hashes = loadHashes();
+  if (slug === true) bail("--hash-reset requires a slug argument.");
+  delete hashes[slug];
+  saveHashes(hashes);
+  log("🔄", `Hash cleared for "${slug}" — will reprocess on next run.`);
+}
+
+function runHashResetAll() {
+  saveHashes({});
+  log("🔄", "All hashes cleared — all posts will reprocess on next run.");
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+async function main() {
+  // ── Management commands (no publishing) ──
+  if (MODE_HASH_SHOW)              return runHashShow();
+  if (MODE_HASH_ALL)               return runHashResetAll();
+  if (MODE_HASH_RESET)             return runHashReset(MODE_HASH_RESET);
+  if (MODE_SET) {
+    const slug       = MODE_SET;
+    const assignment = args[args.indexOf("--set") + 2];
+    return runSet(slug, assignment);
+  }
+
+  // ── Publishing ──
+  ensureExportDir();
+  const hashes = loadHashes();
+
+  let slugs;
+  if (MODE_SLUG) {
+    slugs = [MODE_SLUG];
+    log("🎯", `Single post mode: ${MODE_SLUG}`);
+  } else {
+    slugs = getAllSlugs();
+    log("🔍", `Scanning ${slugs.length} post(s) in ${BLOG_DIR}...`);
+  }
+
+  const toProcess = slugs.filter(slug => {
+    const filePath = findPostFile(slug);
+    if (!hasChanged(slug, filePath, hashes)) {
+      log("⏭️ ", `No changes: ${slug}`);
+      return false;
+    }
+    return true;
+  });
+
+  if (toProcess.length === 0) {
+    console.log("");
+    log("✨", "All posts are up to date. Nothing to publish.");
+    return;
+  }
+
+  console.log("");
+  log("📬", `Processing ${toProcess.length} changed post(s)...`);
+  console.log("");
+
+  let processed = 0;
+  for (const slug of toProcess) {
+    const ok = await processPost(slug, hashes);
+    if (ok) processed++;
+    saveHashes(hashes); // save after each post in case of mid-run failure
+    console.log("");
+  }
+
+  sep();
+  log("🎉", `Done! ${processed} post(s) processed.`);
+  console.log("");
+  if (processed > 0) {
+    console.log("  Next steps:");
+    console.log("  • Hashnode → open .hashnode.md files, paste into editor, set canonical URL");
+    console.log("  • Medium   → open .medium.html in browser, select all, paste into editor");
+    console.log("");
+  }
+}
+
+main().catch(e => {
+  console.error(e);
+  process.exit(1);
+});

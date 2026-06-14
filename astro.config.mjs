@@ -10,14 +10,13 @@ export default defineConfig({
   base: '/',
   build: {
       emptyOutDir: false,
+      outDir: '../calligra.dev',
   },
-  // 1. Move Tailwind out of here and keep only your standard Astro integrations
   integrations: [
     icon(), 
     mdx(), 
     sitemap()
   ],
-  // 2. Pass Tailwind directly to the Vite compilation layer
   vite: {
     plugins: [
       tailwind({

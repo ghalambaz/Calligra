@@ -6,6 +6,9 @@ export interface Blog {
         description: string;
         datetime: string;
         image?: string;
+        type: string;
+        time_to_read: number;
+        level: string;
         category: string;
         tags: string[];
     }

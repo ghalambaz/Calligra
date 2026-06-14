@@ -1,0 +1,123 @@
+#!/usr/bin/env node
+
+import dotenv from 'dotenv';
+import { Client } from '@notionhq/client';
+import { NotionToMarkdown } from 'notion-to-md';
+import * as fs from 'fs';
+import * as path from 'path';
+
+dotenv.config();
+
+const NOTION_TOKEN = process.env.NOTION_TOKEN;
+const NOTION_DATABASE_ID = process.env.NOTION_DATABASE_ID;
+const PUBLISH_DOC_STATUS = process.env.PUBLISH_DOC_STATUS;
+
+if (!NOTION_TOKEN) {
+  console.error('Error: NOTION_TOKEN is missing. Add it to your .env file.');
+  process.exit(1);
+}
+
+if (!NOTION_DATABASE_ID) {
+  console.error('Error: NOTION_DATABASE_ID is missing. Add it to your .env file.');
+  process.exit(1);
+}
+
+const notion = new Client({ auth: NOTION_TOKEN });
+const n2m = new NotionToMarkdown({ notionClient: notion });
+const DATABASE_ID = NOTION_DATABASE_ID;
+
+function getProperty(properties, candidates) {
+  for (const key of candidates) {
+    if (properties[key]) return properties[key];
+  }
+
+  return null;
+}
+
+function getTitle(properties) {
+  const titleProperty = Object.values(properties).find((property) => property.type === 'title');
+  return titleProperty?.title?.[0]?.plain_text ?? 'Untitled';
+}
+
+function getSelectName(properties, candidates, fallback) {
+  const property = getProperty(properties, candidates);
+  return property?.select?.name ?? fallback;
+}
+
+function getNumber(properties, candidates, fallback) {
+  const property = getProperty(properties, candidates);
+  return typeof property?.number === 'number' ? property.number : fallback;
+}
+
+function getTags(properties, candidates) {
+  const property = getProperty(properties, candidates);
+  return property?.multi_select?.map((item) => item.name) ?? [];
+}
+
+async function fetchAllPages(databaseId) {
+  const pages = [];
+  let cursor = undefined;
+
+  while (true) {
+    const response = await notion.dataSources.query({
+      data_source_id: databaseId,
+      start_cursor: cursor,
+      page_size: 100,
+    });
+    pages.push(...response.results);
+
+    if (!response.has_more || !response.next_cursor) {
+      break;
+    }
+
+    cursor = response.next_cursor;
+  }
+
+  return pages;
+}
+
+async function syncPosts() {
+  const pages = await fetchAllPages(DATABASE_ID);
+
+  for (const page of pages) {
+    const props = page.properties;
+    const readyToPublish = getProperty(props, ['status', 'Status']).status.name == PUBLISH_DOC_STATUS ? true: false;
+    if (!readyToPublish) continue; // Skip if not ready to publish
+
+    const title = getTitle(props);
+    const description = getProperty(props, ['description', 'Description'])?.rich_text?.[0]?.plain_text ?? '';
+    const category = getSelectName(props, ['category', 'Category'], 'Uncategorized');
+    const type = getSelectName(props, ['type', 'Type'], 'Article');
+    const level = getSelectName(props, ['level', 'Level'], 'Beginner');
+    const timeToRead = getNumber(props, ['time_to_read', 'time to read', 'Time to Read'], 5);
+    const tags = getTags(props, ['tags', 'Tags']);
+    const datetime = getProperty(props, ['datetime', 'Datetime', 'date'])?.date?.start ?? new Date().toISOString();
+    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+    // 2. Fetch the page content and convert to markdown
+    const mdblocks = await n2m.pageToMarkdown(page.id);
+    const mdString = n2m.toMarkdownString(mdblocks);
+
+    // 3. Construct Astro-compliant Frontmatter
+    const frontmatter = `---
+title: "${title}"
+description: "${description}"
+category: "${category}"
+type: "${type}"
+time_to_read: ${timeToRead}
+level: "${level}"
+tags: ${JSON.stringify(tags)}
+datetime: "${datetime}"
+---
+
+`;
+
+    const fullContent = frontmatter + mdString.parent;
+    const outputPath = path.join(process.cwd(), 'src/content/blog', `${slug}.mdx`);
+    
+    fs.writeFileSync(outputPath, fullContent);
+    console.log(`Synced: ${slug}`);
+  }
+}
+
+syncPosts();
