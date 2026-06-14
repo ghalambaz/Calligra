@@ -53,10 +53,17 @@ Open http://localhost:4321 in your browser to view the site.
 
 | Command | Action |
 | :--- | :--- |
-| `bun install` | Installs dependencies |
-| `bun run dev` | Starts local dev server at `localhost:4321` |
-| `bun run build` | Builds your production site to `./dist/` |
-| `bun run preview` | Previews your production build locally |
+| `npm install` | Installs dependencies |
+| `npm run dev` | Starts local dev server at `localhost:4321` |
+| `npm run build` | Builds your production site to `./dist/` |
+| `npm run preview` | Previews your production build locally |
+
+
+| Make | Action |
+| :--- | :--- |
+| `make run` | Starts local dev server at `localhost:4321`|
+| `make build` | build your production site, put content to the output directory |
+| `make deploy` | Push your production content to the remote repo (github pages) |
 
 📝 Multi-Publishing Automation
 
