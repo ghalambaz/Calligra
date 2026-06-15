@@ -205,7 +205,7 @@ const payload = {
     description:   frontmatter.description ?? "",
     tags:          normalizeTags(frontmatter.tags),
     canonical_url: canonicalUrl,
-    cover_image:   coverUrl,
+    main_image:    coverUrl,
   }
 };
 
@@ -226,7 +226,6 @@ const payload = {
   }
 
   const data = await res.json();
-
   if (!isUpdate) {
     writeFrontmatterKey(filePath, "devto_id", data.id);
     log("✅", `Dev.to: Published! devto_id=${data.id} written to frontmatter.`);
