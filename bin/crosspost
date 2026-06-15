@@ -44,7 +44,7 @@ dotenv.config();
 
 const BLOG_DIR    = path.resolve("src/content/blog");
 const EXPORT_DIR  = path.resolve("src/content/export");
-const HASHES_FILE = path.join(EXPORT_DIR, ".hashes.json");
+const HASHES_FILE = path.join(EXPORT_DIR, ".generated.json");
 const BASE_URL    = process.env.SITE_URL + "/blog";
 const DEVTO_API   = "https://dev.to/api/articles";
 
@@ -129,47 +129,61 @@ function readPost(filePath) {
   return { raw, frontmatter: data, content };
 }
 
-/**
- * Write a single frontmatter key=value back into the file.
- * Handles: strings, numbers, booleans, null.
- */
 function writeFrontmatterKey(filePath, key, value) {
   const raw = fs.readFileSync(filePath, "utf-8");
-
-  // Serialize value for YAML
-  let yamlVal;
-  if (value === null)        yamlVal = "null";
-  else if (value === true)   yamlVal = "true";
-  else if (value === false)  yamlVal = "false";
-  else if (typeof value === "number") yamlVal = String(value);
-  else yamlVal = `"${value}"`;
-
-  // Replace existing key or append before closing ---
-  const keyPattern = new RegExp(`^(${key}:\\s*).*$`, "m");
-  let updated;
-  if (keyPattern.test(raw)) {
-    updated = raw.replace(keyPattern, `${key}: ${yamlVal}`);
-  } else {
-    // Insert before the closing --- of frontmatter
-    updated = raw.replace(/^---\s*$/m, `${key}: ${yamlVal}\n---`);
-  }
-
+  const parsed = matter(raw);
+  
+  // Update the object directly
+  parsed.data[key] = value;
+  
+  // Serialize back to file
+  const updated = matter.stringify(parsed.content, parsed.data);
   fs.writeFileSync(filePath, updated, "utf-8");
 }
 
 /** Remove Astro-specific MDX imports and JSX component tags */
 function stripAstroSyntax(content) {
   return content
+    // Remove import statements
     .replace(/^import\s+.*from\s+['"].*['"]\s*;?\s*$/gm, "")
+    // Remove specific Astro components (ensure this isn't eating your Markdown content)
+    // Only strip if they are on their own line or clearly isolated
     .replace(/<[A-Z][A-Za-z0-9]*[^>]*\/>/g, "")
     .replace(/<\/?[A-Z][A-Za-z0-9]*[^>]*>/g, "")
+    .replace(/```plain text/g, '```plain')
     .trim();
 }
 
 /** Normalize tags to Dev.to format: lowercase, no spaces, max 4 */
 function normalizeTags(tags) {
   if (!Array.isArray(tags)) return [];
-  return tags.map(t => String(t).toLowerCase().replace(/\s+/g, "")).slice(0, 4);
+
+  return tags
+    .map(t => 
+      String(t)
+        .toLowerCase()
+        // Replace everything that is NOT a letter or number with an empty string
+        .replace(/[^a-z0-9]/g, "") 
+    )
+    .filter(t => t.length > 0) // Remove empty strings caused by invalid input
+    .slice(0, 4); // Keep the limit of 4
+}
+
+/** * Replaces relative image paths in Markdown with full URLs
+ * Expected Markdown format: ![alt](image.png) or ![alt](./image.png)
+ * We transform it to: ![alt](https://calligra.dev/images/blog/<slug>/image.png)
+ */
+function normalizeImagePaths(content, slug) {
+  const imageBase = `${process.env.SITE_URL}/`;
+  
+  // Regex explanation:
+  // !\[(.*?)\] matches the alt text
+  // \((?!http)(.*?)\) matches the path, EXCLUDING paths that already start with http
+  return content.replace(/!\[(.*?)\]\((?!http)(.*?)\)/g, (match, alt, path) => {
+    // Clean up the path (remove leading ./ or /)
+    const cleanPath = path.replace(/^\.?\//, "");
+    return `![${alt}](${imageBase}/${cleanPath})`;
+  });
 }
 
 // ─── Dev.to ───────────────────────────────────────────────────────────────────
@@ -181,23 +195,29 @@ async function publishToDevto(filePath, slug, frontmatter, content) {
   const canonicalUrl = `${BASE_URL}/${slug}`;
   const existingId   = frontmatter.devto_id ?? null;
   const isUpdate     = typeof existingId === "number";
+  const coverUrl = frontmatter.image ? `${process.env.SITE_URL}${frontmatter.image}` : null;
 
-  const payload = {
-    article: {
-      title:         frontmatter.title,
-      body_markdown: content,
-      published:     frontmatter.published ?? false,
-      description:   frontmatter.description ?? "",
-      tags:          normalizeTags(frontmatter.tags),
-      canonical_url: canonicalUrl,
-    },
-  };
+const payload = {
+  article: {
+    title:         frontmatter.title,
+    body_markdown: content,
+    published:     frontmatter.published ?? false,
+    description:   frontmatter.description ?? "",
+    tags:          normalizeTags(frontmatter.tags),
+    canonical_url: canonicalUrl,
+    cover_image:   coverUrl,
+  }
+};
+
+console.log("cover_image →", coverUrl);
+
 
   const url    = isUpdate ? `${DEVTO_API}/${existingId}` : DEVTO_API;
   const method = isUpdate ? "PUT" : "POST";
 
   log("🚀", `Dev.to: ${isUpdate ? `Updating article #${existingId}` : "Creating new article"}...`);
 
+  console.log(JSON.stringify(payload));
   const res = await fetch(url, {
     method,
     headers: { "Content-Type": "application/json", "api-key": DEVTO_API_KEY },
@@ -294,7 +314,8 @@ async function processPost(slug, hashes) {
     warn(`"${slug}" has no published field — defaulting to draft`);
   }
 
-  const content = stripAstroSyntax(rawContent);
+  let content = stripAstroSyntax(rawContent);
+  content = normalizeImagePaths(content, slug);
 
   sep();
   log("📄", `Processing: ${slug}`);

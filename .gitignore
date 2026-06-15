@@ -23,6 +23,4 @@ pnpm-debug.log*
 # jetbrains setting folder
 .idea/
 
-# blog posts to not push content publicly on template repo
-src/content/blog/
-src/content/export/
+public/images/blog/
