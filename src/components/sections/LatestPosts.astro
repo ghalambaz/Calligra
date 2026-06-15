@@ -53,7 +53,15 @@ const formatDate = (d: string) => new Date(d).toLocaleDateString('en-US', {
               <h3 class="card-title">{post.data.title}</h3>
             </a>
             <p class="card-desc">{post.data.description}</p>
-            <time datetime={post.data.datetime} class="card-date">{formatDate(post.data.datetime)}</time>
+            <time datetime={post.data.datetime} class="card-date">
+              {formatDate(post.data.datetime)}
+              {post.data.type && (
+              <span>
+                 ({post.data.type})
+              </span>
+              )}
+            </time>
+             
           </div>
         </article>
       ))}
@@ -72,6 +80,19 @@ const formatDate = (d: string) => new Date(d).toLocaleDateString('en-US', {
 </section>
 
 <style>
+.badge-type {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: 100px;
+  white-space: nowrap;
+  background: #f0f0f0;
+  color: #757575;
+  border: 1px solid #dcdcdc;
+}
+
 .latest-section {
   padding: 5rem 0 5rem;
   border-top: 1px solid var(--color-border);
