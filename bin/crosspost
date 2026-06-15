@@ -209,15 +209,11 @@ const payload = {
   }
 };
 
-console.log("cover_image →", coverUrl);
-
-
   const url    = isUpdate ? `${DEVTO_API}/${existingId}` : DEVTO_API;
   const method = isUpdate ? "PUT" : "POST";
 
   log("🚀", `Dev.to: ${isUpdate ? `Updating article #${existingId}` : "Creating new article"}...`);
 
-  console.log(JSON.stringify(payload));
   const res = await fetch(url, {
     method,
     headers: { "Content-Type": "application/json", "api-key": DEVTO_API_KEY },
@@ -239,6 +235,7 @@ console.log("cover_image →", coverUrl);
   }
 
   log("🔗", `Dev.to URL: ${data.url}`);
+  log("🔗", `Open drafts on Dev.to URL: https://dev.to/dashboard`);
 }
 
 // ─── Hashnode export ──────────────────────────────────────────────────────────
