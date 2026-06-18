@@ -1,11 +1,3 @@
-# Repository Settings
-
-* **Repository Name:** `calligra-astro-template`
-* **Short Description (GitHub Sidebar):** A free Astro template and automation toolkit to write once and seamlessly cross-publish content to multiple platforms. Forked and enhanced from astro-resume-theme. Powers calligra.dev.
-* **Topics/Tags:** `astro`, `astro-template`, `portfolio`, `blog`, `cross-posting`, `automation`, `tailwind-css`, `markdown`
-
----
-
 # README.md
 
 # 🖋️ Calligra Astro Template
