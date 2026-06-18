@@ -10,7 +10,6 @@ export default defineConfig({
   base: '/',
   build: {
       emptyOutDir: false,
-      outDir: '../calligra.dev',
   },
   integrations: [
     icon(), 
