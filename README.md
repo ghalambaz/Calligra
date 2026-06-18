@@ -30,7 +30,7 @@ This repository powers the live production site at [calligra.dev](https://callig
 | :--- | :--- | :--- |
 | Astro (local) | ✅ Native | Fully supported |
 | Dev.to | ✅ Compatible | Verified complete compatibility |
-| Medium | ⚠️ Issues | Importer struggles with <blockquote>, <code>, and <pre> tags |
+| Medium | ⚠️ Issues | "Importer struggles with <blockquote>, <code>, and <pre> tags" |
 | Hashnode | ⏳ Pending | Awaiting testing; markdown generation only |
 
 ---
