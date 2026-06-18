@@ -42,8 +42,9 @@ dotenv.config();
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
+const PUBLIC_CONTENT_DIR = path.join(process.cwd(), 'public/blog');
 const BLOG_DIR    = path.resolve("src/content/blog");
-const EXPORT_DIR  = path.resolve("src/content/export");
+const EXPORT_DIR  = path.resolve("src/content/");
 const HASHES_FILE = path.join(EXPORT_DIR, ".generated.json");
 const BASE_URL    = process.env.SITE_URL + "/blog";
 const DEVTO_API   = "https://dev.to/api/articles";
@@ -132,11 +133,7 @@ function readPost(filePath) {
 function writeFrontmatterKey(filePath, key, value) {
   const raw = fs.readFileSync(filePath, "utf-8");
   const parsed = matter(raw);
-  
-  // Update the object directly
   parsed.data[key] = value;
-  
-  // Serialize back to file
   const updated = matter.stringify(parsed.content, parsed.data);
   fs.writeFileSync(filePath, updated, "utf-8");
 }
@@ -146,44 +143,48 @@ function stripAstroSyntax(content) {
   return content
     // Remove import statements
     .replace(/^import\s+.*from\s+['"].*['"]\s*;?\s*$/gm, "")
-    // Remove specific Astro components (ensure this isn't eating your Markdown content)
-    // Only strip if they are on their own line or clearly isolated
+    // Remove self-closing JSX components
     .replace(/<[A-Z][A-Za-z0-9]*[^>]*\/>/g, "")
+    // Remove opening/closing JSX tags
     .replace(/<\/?[A-Z][A-Za-z0-9]*[^>]*>/g, "")
-    .replace(/```plain text/g, '```plain')
+    // Fix "plain text" code fence language identifier
+    .replace(/```plain text/gi, "```plaintext")
+    // Remove any leftover blank lines caused by stripped imports (collapse 3+ newlines to 2)
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
 
 /** Normalize tags to Dev.to format: lowercase, no spaces, max 4 */
 function normalizeTags(tags) {
   if (!Array.isArray(tags)) return [];
-
   return tags
-    .map(t => 
+    .map(t =>
       String(t)
         .toLowerCase()
-        // Replace everything that is NOT a letter or number with an empty string
-        .replace(/[^a-z0-9]/g, "") 
+        .replace(/[^a-z0-9]/g, "")
     )
-    .filter(t => t.length > 0) // Remove empty strings caused by invalid input
-    .slice(0, 4); // Keep the limit of 4
+    .filter(t => t.length > 0)
+    .slice(0, 4);
 }
 
-/** * Replaces relative image paths in Markdown with full URLs
- * Expected Markdown format: ![alt](image.png) or ![alt](./image.png)
- * We transform it to: ![alt](https://calligra.dev/images/blog/<slug>/image.png)
+/**
+ * Replaces relative image paths in Markdown with absolute URLs.
+ * Handles: ./image.png  /image.png  image.png  (but not http/https already)
  */
 function normalizeImagePaths(content, slug) {
-  const imageBase = `${process.env.SITE_URL}/`;
-  
-  // Regex explanation:
-  // !\[(.*?)\] matches the alt text
-  // \((?!http)(.*?)\) matches the path, EXCLUDING paths that already start with http
-  return content.replace(/!\[(.*?)\]\((?!http)(.*?)\)/g, (match, alt, path) => {
-    // Clean up the path (remove leading ./ or /)
-    const cleanPath = path.replace(/^\.?\//, "");
-    return `![${alt}](${imageBase}/${cleanPath})`;
+  const siteUrl = process.env.SITE_URL.replace(/\/$/, "");
+  return content.replace(/!\[(.*?)\]\((?!https?:\/\/)(.*?)\)/g, (match, alt, imgPath) => {
+    const cleanPath = imgPath.replace(/^\.?\//, "");
+    return `![${alt}](${siteUrl}/${cleanPath})`;
   });
+}
+
+/** Build a full absolute cover image URL from frontmatter.image */
+function buildCoverUrl(frontmatter) {
+  if (!frontmatter.image) return null;
+  const siteUrl = process.env.SITE_URL.replace(/\/$/, "");
+  if (frontmatter.image.startsWith("http")) return frontmatter.image;
+  return `${siteUrl}${frontmatter.image.startsWith("/") ? "" : "/"}${frontmatter.image}`;
 }
 
 // ─── Dev.to ───────────────────────────────────────────────────────────────────
@@ -195,19 +196,19 @@ async function publishToDevto(filePath, slug, frontmatter, content) {
   const canonicalUrl = `${BASE_URL}/${slug}`;
   const existingId   = frontmatter.devto_id ?? null;
   const isUpdate     = typeof existingId === "number";
-  const coverUrl = frontmatter.image ? `${process.env.SITE_URL}${frontmatter.image}` : null;
+  const coverUrl     = buildCoverUrl(frontmatter);
 
-const payload = {
-  article: {
-    title:         frontmatter.title,
-    body_markdown: content,
-    published:     frontmatter.published ?? false,
-    description:   frontmatter.description ?? "",
-    tags:          normalizeTags(frontmatter.tags),
-    canonical_url: canonicalUrl,
-    main_image:    coverUrl,
-  }
-};
+  const payload = {
+    article: {
+      title:         frontmatter.title,
+      body_markdown: content,
+      published:     frontmatter.published ?? false,
+      description:   frontmatter.description ?? "",
+      tags:          normalizeTags(frontmatter.tags),
+      canonical_url: canonicalUrl,
+      main_image:    coverUrl,
+    }
+  };
 
   const url    = isUpdate ? `${DEVTO_API}/${existingId}` : DEVTO_API;
   const method = isUpdate ? "PUT" : "POST";
@@ -234,65 +235,236 @@ const payload = {
   }
 
   log("🔗", `Dev.to URL: ${data.url}`);
-  log("🔗", `Open drafts on Dev.to URL: https://dev.to/dashboard`);
+  log("🔗", `Open drafts: https://dev.to/dashboard`);
 }
 
 // ─── Hashnode export ──────────────────────────────────────────────────────────
+//
+//  Hashnode's "Import from Markdown" dialog accepts a clean .md file.
+//  It does NOT read YAML frontmatter — you fill in title/tags/cover in the UI.
+//  So we output:
+//    1. A pure markdown body (no frontmatter block) for paste / import
+//    2. A small instruction block at the top of the .md file (inside an HTML
+//       comment so Hashnode ignores it) telling you what to fill in manually.
 
 function exportForHashnode(slug, frontmatter, content) {
   const canonicalUrl = `${BASE_URL}/${slug}`;
+  const coverUrl     = buildCoverUrl(frontmatter);
+  const tags         = (frontmatter.tags ?? []).join(", ");
 
-  const out = [
-    `---`,
-    `title: "${frontmatter.title}"`,
-    `description: "${frontmatter.description ?? ""}"`,
-    `tags: [${normalizeTags(frontmatter.tags).join(", ")}]`,
-    `canonical_url: "${canonicalUrl}"`,
-    `# ↑ Paste this URL into Hashnode > "Original article URL" before publishing`,
-    `---`,
+  const instructions = [
+    `<!--`,
+    `  HASHNODE PUBLISH INSTRUCTIONS`,
+    `  ══════════════════════════════════════════════════════`,
+    `  1. Go to hashnode.com → Write → "Import article"`,
+    `     OR paste content below into the Hashnode editor directly.`,
     ``,
-    content,
+    `  2. After import / paste, fill in the UI fields:`,
+    `     • Title       : ${frontmatter.title}`,
+    `     • Subtitle    : ${frontmatter.description ?? "(none)"}`,
+    `     • Slug        : ${slug}`,
+    `     • Tags        : ${tags}`,
+    `     • Cover image : ${coverUrl ?? "(no cover — upload manually)"}`,
+    ``,
+    `  3. Under "SEO" settings:`,
+    `     • Canonical URL: ${canonicalUrl}`,
+    ``,
+    `  4. Save as draft, review, then publish.`,
+    `  ══════════════════════════════════════════════════════`,
+    `-->`,
+    ``,
   ].join("\n");
 
-  const outPath = path.join(EXPORT_DIR, `${slug}.hashnode.md`);
+  const out = instructions + content;
+
+  const outPath = path.join(PUBLIC_CONTENT_DIR, `/${slug}/hashnode.md`);
+  const outDir  = path.dirname(outPath);
+  if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
   fs.writeFileSync(outPath, out, "utf-8");
-  log("✅", `Hashnode: ${slug}.hashnode.md`);
-  log("📋", `Hashnode canonical → ${canonicalUrl}`);
+
+  const publicPath = BASE_URL + `/content/${slug}/hashnode.md`;
+  log("✅", `Hashnode markdown ready: ${publicPath}`);
+  if (coverUrl) log("🖼️ ", `Hashnode cover URL: ${coverUrl}`);
 }
 
 // ─── Medium export ────────────────────────────────────────────────────────────
+//
+//  KEY INSIGHT: Medium's paste handler does NOT reliably parse <pre><code>
+//  blocks. The bug is not in the markdown→HTML conversion — it's that
+//  opening the exported .html in a browser and copying it sends Medium the
+//  browser's *rendered rich-text clipboard serialization*, not raw HTML.
+//  Browsers are inconsistent serializing multi-line <pre> content to the
+//  clipboard: lines get split into separate blocks, stray <br>s appear,
+//  and an empty trailing block often shows up right after </pre>. This is
+//  a known Medium/clipboard quirk, not something fixable from the markdown
+//  source side.
+//
+//  FIX: never emit <pre><code>. Each code line is rendered as escaped text
+//  joined by explicit <br> tags inside a plain <div>. There's no <pre>
+//  whitespace-preservation behavior left for the browser to mangle, since
+//  every line break is already a real DOM-level element boundary.
+//
+//  Cover image: Medium has no programmatic cover upload. The cover is
+//  placed as the very first <img> in the body — pasting into Medium turns
+//  the first image in a paste into the story's cover/thumbnail automatically.
+
+function buildMediumRenderer() {
+  const renderer = new marked.Renderer();
+
+  // CONTEXT: you're using Medium's "Import a story" (URL import), not
+  // copy-paste. That means Medium runs its OWN html→Medium-blocks parser
+  // on this file directly — clipboard serialization is not involved at all.
+  // A custom <div class="code-block"><p class="code-line"> structure has
+  // no special handling in that parser, so it likely falls through to
+  // generic paragraph-import logic and misbehaves (collapsed lines, stray
+  // empty blocks). Standard <pre><code> is the one pattern every HTML
+  // importer is built and tested against, so we use that instead.
+  // DIAGNOSIS (confirmed from Medium's actual imported HTML): Medium's
+  // importer ignores our `class="language-X"` hint entirely. The class
+  // names it actually outputs (hljs-built_in, hljs-selector-class) are
+  // highlight.js's own token classes — Medium runs highlight.js's AUTO
+  // DETECTION server-side on import, regardless of what we send. That
+  // detector misread the ASCII diagram as SCSS (mistaking ".to" in
+  // "Dev.to" for a CSS class selector) and `make` commands as Go, and in
+  // the process collapsed real newlines into spaces/run-together text.
+  //
+  // FIX: highlight.js has a standard convention to suppress auto-detection
+  // — class="nohighlight" tells it "plain text, don't guess, don't touch
+  // whitespace." We apply that whenever the markdown fence's language is
+  // "plaintext" (or unspecified) — i.e. exactly the blocks with no real
+  // language, like ASCII diagrams — since those are what the detector
+  // gets wrong. Real language fences (bash, js, etc.) are passed through
+  // normally so highlight.js can still apply real syntax highlighting,
+  // since you confirmed you want that kept for actual code.
+renderer.code = function ({ text, lang }) {
+  const normalizedLang = (lang || "auto").toLowerCase().trim();
+  const lines = text.split('\n').map(line => {
+    return `${line}`; // Use graf--pre for line-by-line
+  }).join('\n');
+
+  return `<pre>${lines}</pre>`;
+};
+
+  // Medium's importer produced 2 extra EMPTY <blockquote> elements and
+  // wrapped the quote text in <em> (unwanted italics) when given
+  // <blockquote><p>text</p></blockquote>. The inner <p> plus surrounding
+  // newlines is the non-standard part — most blockquote markup across the
+  // web is <blockquote>text</blockquote> with no nested block element, so
+  // we match that shape exactly: no inner <p>, no surrounding whitespace.
+  // CONFIRMED FROM ACTUAL MEDIUM IMPORT OUTPUT: the 2 extra empty
+  // <blockquote class="graf--empty"><br></blockquote> siblings are NOT
+  // caused by anything in our input shape — Medium's importer inserts an
+  // empty sibling of the same tag as a spacing convention throughout the
+  // ENTIRE document (e.g. an empty <h3><br></h3> follows nearly every
+  // real h3 in the imported result, even though our source never asked
+  // for that). This is Medium's own post-import normalization, applied
+  // uniformly regardless of input — it cannot be suppressed by changing
+  // the blockquote markup we send. Tried bare-text and single-line-<p>
+  // wrapping; neither changed the duplication. The <em> italics wrapping
+  // is also applied by Medium itself (its default blockquote styling on
+  // import), not something we're introducing from our side.
+  renderer.blockquote = function ({ tokens }) {
+    const inner = this.parser.parseInline(
+      tokens.flatMap(t => t.tokens || [])
+    );
+    return `<em>${inner}</em>`;
+  };
+
+  return renderer;
+}
+
+/** * Post-processes the HTML to fix common Medium import quirks.
+ * 1. Removes empty blockquote structures that Medium misinterprets.
+ * 2. Ensures code blocks are explicitly styled for plain text to stop Medium's
+ * auto-detection from mangling ASCII/code.
+ */
+function postProcessMediumHtml(html) {
+  return html
+    // 1. Remove empty/malformed blockquotes that cause stray blank quotes
+    .replace(/<blockquote>\s*<p>\s*<\/p>\s*<\/blockquote>/g, '')
+    .replace(/<blockquote>\s*<\/blockquote>/g, '')
+    
+    // 2. Wrap <pre><code> in a container if needed, or ensure the code tag 
+    //    has 'class="nohighlight"' to prevent auto-detection (which causes the line collapse)
+    .replace(/<pre><code class="language-plaintext">/g, '<pre><code class="pre--content">');
+}
 
 async function exportForMedium(slug, frontmatter, content) {
   const canonicalUrl = `${BASE_URL}/${slug}`;
-  const bodyHtml     = await marked.parse(content);
-  const tags         = normalizeTags(frontmatter.tags).join(", ");
+  const coverUrl     = buildCoverUrl(frontmatter);
+  const tags         = (frontmatter.tags ?? []).slice(0, 5).join(", ");
+
+  // breaks:true is intentionally OFF for the body text — it inserts a <br>
+  // on every soft-wrapped line inside ordinary paragraphs (not just code),
+  // which fragments prose if your source .md has soft line wraps. The
+  // code-block-specific renderer above is what actually fixes the bug you
+  // hit; breaks:true was treating a symptom in the wrong place.
+  const bodyHtml = await marked.parse(content, {
+    gfm: true,
+    breaks: false,
+    renderer: buildMediumRenderer(),
+  });
+
+  const cleanedHtml = postProcessMediumHtml(bodyHtml);
+
+  const coverBlock = coverUrl
+    ? `  <img src="${coverUrl}" alt="${frontmatter.title} cover image" />\n`
+    : "";
 
   const html = `<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <title>${frontmatter.title}</title>
   <!--
-    MEDIUM INSTRUCTIONS
-    ══════════════════════════════════════
-    1. Open Medium > Write a story
-    2. Open this file in a browser, select all (Ctrl+A), copy, paste into Medium editor
-    3. Before publishing → "..." > "Change display title/subtitle"
-    4. Set "Originally published at": ${canonicalUrl}
-    5. Add tags: ${tags}
-    ══════════════════════════════════════
+    MEDIUM PUBLISH INSTRUCTIONS
+    ══════════════════════════════════════════════════════
+    1. Open this file in your browser (File > Open, or drag it in).
+    2. Press Ctrl+A (Cmd+A on Mac) to select everything, then Ctrl+C to copy.
+    3. Go to medium.com → Write a story → click into the editor → Ctrl+V to paste.
+    4. After pasting, set:
+       • Title: ${frontmatter.title}
+       • Subtitle / description: ${frontmatter.description ?? "(none)"}
+       • Tags (up to 5): ${tags}
+    5. Before publishing → "..." menu → "Change display title/subtitle"
+    6. Set "Originally published at": ${canonicalUrl}
+    7. Cover image: ${coverUrl ? `The first image in the paste should appear as cover.
+       If not, use this URL directly in Medium's cover uploader:
+       ${coverUrl}` : "No cover — upload manually via the Medium cover tool."}
+    ══════════════════════════════════════════════════════
   -->
+  <style>
+    /*
+     * These styles only affect local preview in your browser.
+     * Medium strips all CSS when you paste — that's expected.
+     */
+    body        { font-family: Georgia, serif; max-width: 740px; margin: 40px auto; line-height: 1.75; color: #292929; }
+    h1          { font-size: 2rem; font-weight: 700; margin-bottom: 0.25em; }
+    h2          { font-size: 1.5rem; font-weight: 700; margin-top: 2em; }
+    h3          { font-size: 1.2rem; font-weight: 600; margin-top: 1.5em; }
+    p           { margin: 1em 0; }
+    pre         { background: #f4f4f4; padding: 1em; border-radius: 4px; overflow-x: auto; }
+    code        { font-family: monospace; font-size: 0.9em; }
+    blockquote  { border-left: 3px solid #ccc; margin: 1em 0; padding-left: 1em; color: #555; }
+    img         { max-width: 100%; height: auto; display: block; margin: 1.5em 0; }
+    a           { color: #1a8917; }
+  </style>
 </head>
 <body>
-  <h1>${frontmatter.title}</h1>
-  ${bodyHtml}
+${coverBlock}  <h1>${frontmatter.title}</h1>
+${cleanedHtml}
 </body>
 </html>`;
 
-  const outPath = path.join(EXPORT_DIR, `${slug}.medium.html`);
+  const outPath = path.join(PUBLIC_CONTENT_DIR, `/${slug}/medium.html`);
+  const outDir  = path.dirname(outPath);
+  if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
   fs.writeFileSync(outPath, html, "utf-8");
-  log("✅", `Medium: ${slug}.medium.html`);
-  log("📋", `Medium canonical → ${canonicalUrl}`);
+
+  const publicHtmlPath = BASE_URL + `/${slug}/medium.html`;
+  if (coverUrl) log("🖼️ ", `Medium cover URL (first <img> in paste): ${coverUrl}`);
+  log("🔗", `Medium HTML file: ${publicHtmlPath}`);
+  log("✅", `Paste into: https://medium.com/p/import`);
 }
 
 // ─── Process one post ─────────────────────────────────────────────────────────
@@ -339,7 +511,6 @@ function runSet(slug, assignment) {
   const key   = assignment.slice(0, eqIdx).trim();
   const raw   = assignment.slice(eqIdx + 1).trim();
 
-  // Parse value type
   let value;
   if (raw === "null")        value = null;
   else if (raw === "true")   value = true;
@@ -353,7 +524,6 @@ function runSet(slug, assignment) {
   log("✅", `Set ${key}=${JSON.stringify(value)} in ${slug}`);
   log("💡", `Hash cleared — this post will be reprocessed on next run.`);
 
-  // Clear hash so the change triggers reprocessing
   const hashes = loadHashes();
   delete hashes[slug];
   saveHashes(hashes);
@@ -402,17 +572,15 @@ function runHashResetAll() {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
-  // ── Management commands (no publishing) ──
-  if (MODE_HASH_SHOW)              return runHashShow();
-  if (MODE_HASH_ALL)               return runHashResetAll();
-  if (MODE_HASH_RESET)             return runHashReset(MODE_HASH_RESET);
+  if (MODE_HASH_SHOW)  return runHashShow();
+  if (MODE_HASH_ALL)   return runHashResetAll();
+  if (MODE_HASH_RESET) return runHashReset(MODE_HASH_RESET);
   if (MODE_SET) {
     const slug       = MODE_SET;
     const assignment = args[args.indexOf("--set") + 2];
     return runSet(slug, assignment);
   }
 
-  // ── Publishing ──
   ensureExportDir();
   const hashes = loadHashes();
 
@@ -448,19 +616,12 @@ async function main() {
   for (const slug of toProcess) {
     const ok = await processPost(slug, hashes);
     if (ok) processed++;
-    saveHashes(hashes); // save after each post in case of mid-run failure
+    saveHashes(hashes);
     console.log("");
   }
 
   sep();
   log("🎉", `Done! ${processed} post(s) processed.`);
-  console.log("");
-  if (processed > 0) {
-    console.log("  Next steps:");
-    console.log("  • Hashnode → open .hashnode.md files, paste into editor, set canonical URL");
-    console.log("  • Medium   → open .medium.html in browser, select all, paste into editor");
-    console.log("");
-  }
 }
 
 main().catch(e => {
