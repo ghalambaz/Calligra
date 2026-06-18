@@ -7,7 +7,6 @@ if [ -f .env ]; then
   set +a
 fi
 
-# Validate paths
 if [ -z "$BUILD_DIR" ]; then
   echo "Error: BUILD_DIR must be set in .env"
   exit 1
@@ -53,3 +52,6 @@ else
 fi
 
 echo "🚀 Deployment finished!"
+echo "Latest Version available at:"
+echo "$SITE_URL/version.json"
+echo "$SITE_URL/version.html"
