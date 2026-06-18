@@ -26,6 +26,8 @@ rsync \
     --delete \
     --exclude='.git' \
     --exclude='version.json' \
+	--exclude='version.html' \
+	--exclude '.build_counter' \
     "$TMP_DIR/" "$BUILD_DIR/"
 
 
@@ -85,3 +87,8 @@ fi
 
 echo "Committing..."
 git -C "$BUILD_DIR" commit -m "deploy: $BUILD_TIME" || echo "Nothing to commit"
+
+echo "Build complete"
+echo "Build number: $BUILD_NUMBER"
+echo "Commit: $GIT_SHA"
+echo "Build time: $BUILD_TIME"
