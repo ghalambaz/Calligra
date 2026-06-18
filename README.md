@@ -25,7 +25,15 @@ This repository powers the live production site at [calligra.dev](https://callig
 - **Dark Mode:** Seamless light/dark mode transition out of the box.
 
 ---
+## 🚀 Deployment & Compatibility Status
+| Platform | Status | Notes |
+| :--- | :--- | :--- |
+| Astro (local) | ✅ Native | Fully supported |
+| Dev.to | ✅ Compatible | Verified complete compatibility |
+| Medium | ⚠️ Issues | Importer struggles with <blockquote>, <code>, and <pre> tags |
+| Hashnode | ⏳ Pending | Awaiting testing; markdown generation only |
 
+---
 ## 🛠️ Getting Started
 
 ### Prerequisites
@@ -58,9 +66,9 @@ Open http://localhost:4321 in your browser to view the site.
 | `make sync` | Pull content from Notion and generate Markdown posts |
 | `make deploy` | Push your production content to the remote repo (github pages) |
 
-# Content Sync and Crossposting Automation
+# Content Sync and Publishing Automation
 
-The project includes a Notion sync command and a set of make targets for crossposting posts to external platforms.
+The project includes a Notion sync command and a set of make targets for publishing posts to external platforms.
 
 ## Command Table
 
@@ -78,7 +86,7 @@ The project includes a Notion sync command and a set of make targets for crosspo
 
 `make sync` reads `NOTION_TOKEN` and `NOTION_DATABASE_ID` from your environment before generating posts.
 
-`make publish` and the other crossposting targets are available now through the `bin/crosspost` script.
+`make publish` and the other publishing targets are available now through the `bin/publish` script.
 
 ⚖️ License & Acknowledgments
 
