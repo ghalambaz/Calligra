@@ -161,17 +161,27 @@ const formatDate = (d: string) => new Date(d).toLocaleDateString('en-US', {
   transform: translateY(-2px);
 }
 
-/* Featured card (first) has taller image */
-.post-card--featured .card-img-link { aspect-ratio: 16 / 8; }
-.card-img-link {
-  display: block;
-  aspect-ratio: 16 / 8;
-  overflow: hidden;
+/* Ensure both featured and standard cards use the same ratio */
+.post-card--featured .card-img-link { 
+  aspect-ratio: 16 / 8; /* You can set this to whatever ratio you prefer */
 }
 
+/* 1. The container acts as the frame with the border-radius */
+.card-img-link {
+  display: block;
+  height: 85%;        /* Set a fixed height for consistency */
+  width: 100%;
+  overflow: hidden;     /* This clips the image to the border-radius */
+  border-radius: 14px;  /* Apply radius here, not on the image */
+  background: var(--color-background-offset); /* Shown if image is narrow */
+}
+
+/* 2. The image fills the frame without distortion */
 .card-img {
-  width: 100%; height: 100%;
-  object-fit: cover;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;    /* Ensures wide/narrow images fill the 200px height */
+  object-position: center;
   display: block;
   transition: transform 0.4s ease;
 }

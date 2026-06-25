@@ -3,6 +3,7 @@ import { getCollection } from 'astro:content';
 import { render } from 'astro:content';
 import type { CollectionEntry } from 'astro:content';
 import Layout from '../../layouts/Layout.astro';
+import { Image } from 'astro:assets';
 
 export const getStaticPaths = async () => {
     const blog = await getCollection('blog');
@@ -66,7 +67,14 @@ const tags = blog.data.tags ?? [];
     {blog.data.image && (
       <div class="post-cover">
         <div class="container mx-auto max-w-4xl px-4 md:px-8">
-          <img src={blog.data.image} alt={blog.data.title} class="cover-img" loading="eager" />
+          <Image 
+            src={blog.data.image} 
+            alt={blog.data.title} 
+            class="cover-img" 
+            width={1200} 
+            height={675} 
+            format="webp" 
+          />
         </div>
       </div>
     )}
@@ -156,10 +164,39 @@ const tags = blog.data.tags ?? [];
   color: var(--color-border);
 }
 
-.post-cover { padding: 1.75rem 0 0; }
+.post-cover { 
+  width: 100%;
+  padding: 1.75rem 0 0;
+  /* This container acts as the mask for your border-radius */
+}
+
+/* Ensure your Image component in the template uses a class like 'cover-img' */
 .cover-img {
-  width: 100%; border-radius: 14px;
-  aspect-ratio: 16/6; object-fit: cover;
+  display: block;
+  width: 100%;
+  /* Set a fixed height to keep the banner uniform even if images vary */
+  height: 400px; 
+  /* This ensures the image always fills the 400px space regardless of ratio */
+  object-fit: cover;
+  object-position: center;
+  /* Apply the radius to the image itself, or to the container if wrapping */
+  border-radius: 14px;
+}
+
+.card-img-link {
+  display: block;
+  aspect-ratio: 16 / 8;
+  overflow: hidden;     
+  border-radius: 14px;
+}
+
+.card-img {
+  width: 100%;
+  height: 80%;
+  object-fit: block;
+  background-color: var(--color-background);
+  display: block;
+  transition: transform 0.4s ease;
 }
 
 .post-footer {
